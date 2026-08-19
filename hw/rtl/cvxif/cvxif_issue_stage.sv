@@ -60,7 +60,7 @@ module cvxif_issue_stage (
       busy_q        <= 1'b0;
       latched_rs1_q <= 'b0;
       latched_rs2_q <= 'b0;
-    end else if begin
+    end else begin
       // Update the busy state every clock cycle
       busy_q <= busy_d;
       // Capture incoming operands into internal registers

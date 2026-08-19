@@ -64,9 +64,9 @@ int main(int argc, char* argv[]) {
                 std::cerr << "[FAIL] Coprocessor failed to deassert ready signal" << std::endl;
                 exit(1);
             }
-        } else if (cycle_count == )
+        }
 
-        cycle_count++:
+        cycle_count++;
     }
 
     // --- Tidy Up
