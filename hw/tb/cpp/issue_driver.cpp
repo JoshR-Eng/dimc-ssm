@@ -5,13 +5,83 @@
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
-void half_clock_cycle(Vcvxif_issue_stage* top, VerilatorContext* contextp, VerilatedVcdC* tfp) {
-    top->clk_i ^= 1;                // Flip clock state
-    top->eval();                    // Update hardware
-    tfp->dump(contextp->time());    // Dump data to waveform
-    contextp->timeInc(1);           // Advance time 1 tick
+
+// --- Helper Fuctions & Test Cases
+namespace {
+    constexpr int ksimTimeoutCycles = 200;  // Immutable Timeout Limit
+    int g_fail_count = 0;                   // Failed Test Counter
+
+    // --- Helper Functions
+    void check(bool condition, const std::string& message) {
+        if (!condition) {
+            std::cerr << "[FAIL] " << message << std::endl;
+            ++g_fail_count;
+        }
+    }
+
+    // Drives one half period of clk-I and advances sim trace by one tick
+    void half_clock_cycle(Vcvxif_issue_stage* top, VerilatorContext* contextp,
+                          VerilatedVcdC* tfp) {
+        top->clk_i ^= 1;                // Flip clock state
+        top->eval();                    // Update hardware
+        tfp->dump(contextp->time());    // Dump data to waveform
+        contextp->timeInc(1);           // Advance time 1 tick
+    }
+
+    // Drives full clock cycle & can apply test stimulus before rising edge
+    void tick(Vcvxif_issue_stage* top, VerilatedContext* contextp,
+              VerilatedVcdC* tfp, const std::function<void()>& stimulus = nullptr) {
+        half_clock_cycle(top, contextp, tfp); // clk_i >> LOW
+        if (stimulus) stimulus();
+        half_clock_cycle(top, contextp, tfp); // clk_i >> HIGH
+    }
+
+    // Reset Variables and tick one clock cycle
+    void apply_reset(Vcvxif_issue_stage* top, VerilatedContext* contextp,
+                     VerilatedVcdC* tfp) {
+        top->rst_ni         = 0;
+        top->issue_valid_i  = 0;
+        top->issue_rs1_i    = 0;
+        top->issue_rs2_i    = 0;
+        top->mac_done_i     = 0;
+        for (int i = 0; i < 3; ++i) tick(top, contextp, tfp);
+        top->rst_ni = 1;
+        tick(top, contextp, tfp);
+
+        check(top->issue_ready_o == 1,
+            "Reset: `issue_ready_o` not high right after reset");
+    }
+
+
+    // --- Test Cases
+    // Scenario 1: Complete handshake
+    //      - Accept
+    //      - Ready deasserts while busy
+    //      - Relase on `mac_done_i`
+    void test_handshake(Vcvxif_issue_stage* top, VerilatedContext* contextp,
+                        VerilatedVcdC* tfp) {
+        apply_reset(top, contextp, tfp);
+        tick(top, contextp, tfp, [&] { top->issue_valid_i = 1; });
+        tick(top, contextp, tfp, [&] { top->issue_valid_i = 1; });
+        check(top->issue_ready_o == 0,
+                "'test_handshake': Coprocessor did not deassert ready signal");
+
+        for (int i = 0; i < 3; ++i) {
+            tick(top, contextp, tfp);
+            check(top->issue_ready_o == 0,
+                    "'test_handshake': ready remained high while still busy");
+        }
+
+        tick(top, contextp, tfp, [&] { top->mac_done_i = 1; });
+        tick(top, contextp, tfp, [&] { top->mac_done_i = 0; });
+        check(top->issue_ready_o == 1,
+                "'test_handshake': ready did not reassert after `mac_done_i`");
+    }
 }
 
+
+
+// --- Main Test Loop
 int main(int argc, char* argv[]) {
 
     // --- Initialise Verilator
