@@ -14,15 +14,17 @@
 /////////////////////////////////////////////////////////////////////////////////////
 
 
-module cvxif_issue_stage (
+module cvxif_issue_stage #(
+  parameter int DATA_WIDTH = 32           // Operand bus width
+) (
   input   logic         clk_i,            // System Clock
   input   logic         rst_ni,           // Active-low asynchronous reset
 
   // Host Interface
-  input   logic         issue_valid_i,    // Host offlead request valid
-  output  logic         issue_ready_o,    // Coprocessor accept ready
-  input   logic [31:0]  issue_rs1_i,      // Instruction Operand 1
-  input   logic [31:0]  issue_rs2_i,      // Instruction Operand 2
+  input   logic                   issue_valid_i,    // Host offlead request valid
+  output  logic                   issue_ready_o,    // Coprocessor accept ready
+  input   logic [DATA_WIDTH-1:0]  issue_rs1_i,      // Instruction Operand 1
+  input   logic [DATA_WIDTH-1:0]  issue_rs2_i,      // Instruction Operand 2
 
   // Internal Coprocessor Flags (dummy MAC for this v0.1 phase)
   input   logic         mac_done_i        // Flag from dummy MAC indicating completion
