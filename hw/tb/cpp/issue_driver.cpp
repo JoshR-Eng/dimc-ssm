@@ -20,7 +20,7 @@ namespace {
     }
 
     // Drives one half period of clk-I and advances sim trace by one tick
-    void half_clock_cycle(Vcvxif_issue_stage* top, VerilatorContext* contextp,
+    void half_clock_cycle(Vcvxif_issue_stage* top, VerilatedContext* contextp,
                           VerilatedVcdC* tfp) {
         top->clk_i ^= 1;                // Flip clock state
         top->eval();                    // Update hardware
@@ -53,29 +53,35 @@ namespace {
     }
 
 
-    // --- Test Cases
-    // Scenario 1: Complete handshake
-    //      - Accept
-    //      - Ready deasserts while busy
-    //      - Relase on `mac_done_i`
-    void test_handshake(Vcvxif_issue_stage* top, VerilatedContext* contextp,
-                        VerilatedVcdC* tfp) {
+    // Scenario 1: Saturate FIFO
+    //      - pass 8 consecutive instructions
+    //      - Verify backpressure (ready_o == 0)
+    //      - Drain the pipeline and check recovery
+    void test_fifo_saturation(Vcvxif_issue_stage* top, VerilatedContext* contextp, VerilatedVcdC* tfp) {
         apply_reset(top, contextp, tfp);
-        tick(top, contextp, tfp, [&] { top->issue_valid_i = 1; });
-        tick(top, contextp, tfp, [&] { top->issue_valid_i = 1; });
-        check(top->issue_ready_o == 0,
-                "'test_handshake': Coprocessor did not deassert ready signal");
 
-        for (int i = 0; i < 3; ++i) {
-            tick(top, contextp, tfp);
-            check(top->issue_ready_o == 0,
-                    "'test_handshake': ready remained high while still busy");
+        // The host CPU offloads 8 instructions in a single cycle stream
+        for (int i = 0; i < 8; ++i) {
+            check(top->issue_ready_o == 1, "Burst: Coprocessor stalled prematurely");
+
+            tick(top, contextp, tfp, [&] {
+                top->issue_valid_i = 1;
+                top->issue_rs1_i = i + 1; // Inject identifiable operand data
+            });
         }
 
-        tick(top, contextp, tfp, [&] { top->mac_done_i = 1; });
+        // The FIFO should now be perfectly full. coprocessor MUST apply backpressure.
+        tick(top, contextp, tfp, [&] { top->issue_valid_i = 0; });
+        check(top->issue_ready_o == 0, "Backpressure: ready_o remained high when FIFO was full");
+
+        // The MAC engine finishes 8 consecutive operations
+        for (int i = 0; i < 8; ++i) {
+            tick(top, contextp, tfp, [&] { top->mac_done_i = 1; });
+        }
+
+        // The FIFO is empty again, should be ready to accept new host data
         tick(top, contextp, tfp, [&] { top->mac_done_i = 0; });
-        check(top->issue_ready_o == 1,
-                "'test_handshake': ready did not reassert after `mac_done_i`");
+        check(top->issue_ready_o == 1, "Recovery: ready_o did not reassert after drain");
     }
 }
 
@@ -87,61 +93,36 @@ int main(int argc, char* argv[]) {
     // --- Initialise Verilator
     // Initialise Verilator context & trace
     const std::unique_ptr<VerilatedContext> contextp{new VerilatedContext};
+    contextp->commandArgs(argc, argv);
     contextp->traceEverOn(true);
-    // Instantiate the SystemVerilog Module
-    const std::unique_ptr<Vcvxif_issue_stage> top{new Vcvxif_issue_stage{contextp.get()}};
+
+    const std::unique_ptr<Vcvxif_issue_stage> top{
+        new Vcvxif_issue_stage{contextp.get()}};
 
     // Setup Waveform Dumping
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
     tfp->open("issue_stage_waveform.vcd");
 
-    // Initialise all input signals
-    top->clk_i          = 0;
-    top->rst_ni         = 0;
-    top->issue_valid_i  = 0;
-    top->mac_done_i     = 0;
 
+    // --- Run Test cases
+    test_fifo_saturation(top.get(), contextp.get(), tfp);
 
-    // --- Simulation Loop
-    int cycle_count = 0;
-    int cycle_count_max = 20;
-    half_clock_cycle(top.get(), contextp.get(), tfp);
-
-    while (!contextp->gotFinished() && cycle_count < cycle_count_max) {
-        half_clock_cycle(top.get(), contextp.get(), tfp);   // Clock LOW
-
-        // Stimulation
-        if (cycle_count == 1) {         // Cycle 1-2: Assert reset
-            top->rst_ni = 0;
-        } else if (cycle_count == 2) {
-            top->rst_ni = 1;
-        } else if (cycle_count == 4) {  // Cycle 4: Host sends valid data
-            top->issue_valid_i = 1;
-        } else if (cycle_count == 5) {  // Cycle 5: Host drops valid
-            top->issue_valid_i = 0;
-        } else if (cycle_count == 8) {  // Cycle 8: MAC finishes
-            top->mac_done_i = 1;
-        } else if (cycle_count == 9) {  // Cycle 9: MAC drops done
-            top->mac_done_i = 0;
-        }
-
-        half_clock_cycle(top.get(), contextp.get(), tfp);   // Clock HIGH
-
-        // Evaluation
-        if (cycle_count == 5) {
-            if (top->issue_ready_o != 0) {
-                std::cerr << "[FAIL] Coprocessor failed to deassert ready signal" << std::endl;
-                exit(1);
-            }
-        }
-
-        cycle_count++;
+    // --- Handle timeout scenario
+    if (contextp->time() > ksimTimeoutCycles * 2) {
+        std::cerr << "[FAIL] Timeout Error" << std::endl;
+        ++g_fail_count;
     }
 
     // --- Tidy Up
     top->final();
     tfp->close();
     delete tfp;
-    return 0;
+
+    if (g_fail_count == 0) {
+        std::cout << "[PASS] All `cvxif_issue_stage` tests passed" << std::endl;
+    } else {
+        std::cerr << "[FAIL] " << g_fail_count << " check(s) failed" << std::endl;
+    }
+    return g_fail_count == 0 ? 0 : 1;
 }
