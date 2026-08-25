@@ -19,58 +19,45 @@ module cvxif_issue_stage #(
 ) (
   input   logic         clk_i,            // System Clock
   input   logic         rst_ni,           // Active-low asynchronous reset
-
   // Host Interface
   input   logic                   issue_valid_i,    // Host offlead request valid
   output  logic                   issue_ready_o,    // Coprocessor accept ready
   input   logic [DATA_WIDTH-1:0]  issue_rs1_i,      // Instruction Operand 1
   input   logic [DATA_WIDTH-1:0]  issue_rs2_i,      // Instruction Operand 2
-
-  // Internal Coprocessor Flags (dummy MAC for this v0.1 phase)
-  input   logic         mac_done_i        // Flag from dummy MAC indicating completion
+  // Coprocessor MAC Interface (dummy MAC for this v0.1 phase)
+  input   logic                   mac_done_i,       // Flag from dummy MAC indicating completion
+  output  logic [DATA_WIDTH-1:0]  mac_rs1_o,
+  output  logic [DATA_WIDTH-1:0]  mac_rs2_o,
+  output  logic                   mac_valid_o
 );
 
-  logic issue_accept_s;
-  logic busy_q;
-  logic busy_d;
-
-  logic [31:0] latched_rs1_q;
-  logic [31:0] latched_rs2_q;
+  logic fifo_full;
+  logic fifo_empty;
 
   // --- Handshake Logic
-  // Coprocessor ready to accept new instruction if not currently busy
-  assign issue_ready_o  = ~busy_q;
-  assign issue_accept_s = issue_valid_i & issue_ready_o;
+  // Coprocessor ready to accept new instruction as long as FIFO isn't full
+  assign issue_ready_o = ~fifo_full;
 
-  // --- Next-State Logic for the Depth-1 FIFO
-  always_comb begin : busy_flag_logic
-    busy_d = busy_q; // Default assignment
-
-    if (issue_accept_s) begin
-      // A new instuction is accepted - Coprocessor now busy.
-      busy_d = 1'b1;
-    end else if (mac_done_i) begin
-      // The MAC finished and no new instruction is waiting - no longer busy
-      busy_d = 1'b0;
-    end
-  end
+  // --- MAC Control
+  //  MAC has valid data to compute if FIFO not empty
+  assign mac_valid_o = ~fifo_empty;
 
 
-  // --- Sequential Logic (to Capture operands)
-  always_ff @(posedge clk_i or negedge rst_ni) begin
-    if (!rst_ni) begin
-      busy_q        <= 1'b0;
-      latched_rs1_q <= 'b0;
-      latched_rs2_q <= 'b0;
-    end else begin
-      // Update the busy state every clock cycle
-      busy_q <= busy_d;
-      // Capture incoming operands into internal registers
-      if (issue_accept_s) begin
-        latched_rs1_q <= issue_rs1_i;
-        latched_rs2_q <= issue_rs2_i;
-      end
-    end
-  end
+  // --- FIFO Instantiation
+  sync_fifo #(
+    .DEPTH(8),
+    .DATA_WIDTH(DATA_WIDTH)
+  ) i_instruction_fifo (
+    .clk_i    (clk_i),
+    .rst_ni   (rst_ni),
+    .r1_i     (issue_rs1_i),
+    .r2_i     (issue_rs2_i),
+    .push_i   (issue_valid_i & issue_ready_o),
+    .pop_i    (mac_done_i),
+    .r1_o     (mac_rs1_o),
+    .r2_o     (mac_rs2_o),
+    .full_o   (fifo_full),
+    .empty_o  (fifo_empty)
+  )
 
 endmodule
