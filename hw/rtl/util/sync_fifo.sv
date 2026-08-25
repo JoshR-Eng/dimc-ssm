@@ -13,12 +13,13 @@
 /////////////////////////////////////////////////////////////////////////////////////
 
 module sync_fifo#(
-  parameter int unsigned DEPTH       = 8;
+  parameter int unsigned DEPTH       = 8,
   parameter int unsigned DATA_WIDTH  = 32
 ) (
   input                     clk_i,
   input                     rst_ni,
   input                     push_i,
+  input                     pop_i,
   input   [DATA_WIDTH-1:0]  r1_i,
   input   [DATA_WIDTH-1:0]  r2_i,
   output  [DATA_WIDTH-1:0]  r1_o,

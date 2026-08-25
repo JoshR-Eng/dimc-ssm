@@ -3,13 +3,14 @@
 # Description: Makefile for linting and testing SSM Coprocessor
 
 # --- Toolchain ---
-VERILATOR = verilator
-LINT_FLAGS = --lint-only -Wall
-SIM_FLAGS = -cc --exe --build --trace --Wall
+VERILATOR := verilator
+LINT_FLAGS := --lint-only -Wall
+SIM_FLAGS := -cc --exe --build --trace --Wall
 
 # --- RTL Sources ---
-RTL_SRC = hw/rtl/cvxif/cvxif_issue_stage.sv
-TB_SRC = hw/tb/cpp/issue_driver.cpp
+RTL_DIR := hw/rtl/
+RTL_SRC := $(wildcard $(RTL_DIR)/*.sv) $(wildcard $(RTL_DIR)/*/*.sv)
+TB_SRC := hw/tb/cpp/issue_driver.cpp
 
 # --- Commands ---
 .PHONY: all lint sim clean
