@@ -58,6 +58,6 @@ module cvxif_issue_stage #(
     .r2_o     (mac_rs2_o),
     .full_o   (fifo_full),
     .empty_o  (fifo_empty)
-  )
+  );
 
 endmodule
