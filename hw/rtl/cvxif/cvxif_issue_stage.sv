@@ -25,7 +25,7 @@ module cvxif_issue_stage #(
   input   logic [DATA_WIDTH-1:0]  issue_rs1_i,      // Instruction Operand 1
   input   logic [DATA_WIDTH-1:0]  issue_rs2_i,      // Instruction Operand 2
   // Coprocessor MAC Interface (dummy MAC for this v0.1 phase)
-  input   logic                   mac_done_i,       // Flag from dummy MAC indicating completion
+  input   logic                   mac_ready_i,
   output  logic [DATA_WIDTH-1:0]  mac_rs1_o,
   output  logic [DATA_WIDTH-1:0]  mac_rs2_o,
   output  logic                   mac_valid_o
@@ -53,7 +53,7 @@ module cvxif_issue_stage #(
     .r1_i     (issue_rs1_i),
     .r2_i     (issue_rs2_i),
     .push_i   (issue_valid_i & issue_ready_o),
-    .pop_i    (mac_done_i),
+    .pop_i    (mac_valid_o & mac_ready_i),
     .r1_o     (mac_rs1_o),
     .r2_o     (mac_rs2_o),
     .full_o   (fifo_full),

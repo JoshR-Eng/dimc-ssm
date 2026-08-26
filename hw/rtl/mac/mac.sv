@@ -21,6 +21,8 @@ module mac #(
   // Control Interface
   input  logic valid_i,       // Driven by CV-X-IF interface
   input  logic clear_accum_i, // Set HIGH to reste the sum to 0
+  input  logic ready_i,       // Tells MAC if Host is ready for results
+  output logic ready_o,       // Tells FIFO if it wants to keep adding data
   output logic valid_o,       // HIGH when accumulator has valid output
   // Data Interface
   input  logic [DATA_WIDTH-1:0]       rs1_i,
@@ -28,6 +30,7 @@ module mac #(
   output logic [(DATA_WIDTH * 2)-1:0] result_o
 );
 
+assign ready_o = ready_i
 
 // --- 1. MULTIPLIER
 logic [(DATA_WIDTH * 2)-1:0] mult_product_d, mult_product_q;
@@ -39,7 +42,7 @@ always_ff @(posedge clk_i or negedge rst_ni) begin : read_memory
   if (!rst_ni) begin
     mult_product_q <= '0;
     mult_valid_q   <= 1'b0;
-  end else begin
+  end else if (ready_i) begin
     mult_product_q <= mult_product_d;
     mult_valid_q   <= valid_i;
   end
@@ -72,7 +75,7 @@ always_ff @( posedge clk_i or negedge rst_ni ) begin : accumulate
     accum_sum_q   <= '0;
     accum_valid_q <= 1'b0;
     clear_accum_q <= '0;
-  end else begin
+  end else if (ready_i) begin
     accum_sum_q   <= accum_sum_d;
     accum_valid_q <= mult_valid_q;
     clear_accum_q <= clear_accum_d;
