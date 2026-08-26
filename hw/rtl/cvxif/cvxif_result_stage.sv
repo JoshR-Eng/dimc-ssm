@@ -5,12 +5,11 @@
 /////////////////////////////////////////////////////////////////////////////////////
 // Engineer:        Josh Rawlinson - joshrawlinson05@outlook.com
 // Date:            2026-08-25
-// Design Name:     Multiple-Accumulate  (MAC)
+// Design Name:     CV-X-IF Results Stage
 // Description:
-//   Basic Multiple-Accumulate (MAC) module
-//   This is a placeholder for future development
-//   later development will replace this dummy MAC with an
-//   Analog In-Memory Compute crossbar
+//   CV-X-IF Results Stage Handshake.
+//   Manages the asynchronous valid/ready boundary between the host core
+//   and the internal TCDM streaming queue. Ensures zero combinational
 /////////////////////////////////////////////////////////////////////////////////////
 
 module cvxif_result_stage #(
