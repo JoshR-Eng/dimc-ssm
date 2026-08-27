@@ -57,10 +57,10 @@ class Testbench {
         void tick() {
             dut_->clk_i = 0;
             eval_and_dump();
-            advance_time(tb_cfg::clk_period_ns_ / 2.0);
+            advance_time(clk_period_ns_ / 2.0);
             dut_->clk_i = 1;
             eval_and_dump();
-            advance_time(tb_cfg::clk_period_ns_ / 2.0);
+            advance_time(clk_period_ns_ / 2.0);
 
             ++cycle_count_;
         }

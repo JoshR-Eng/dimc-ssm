@@ -5,7 +5,7 @@
 #include <string>
 
 #include "testbench.hpp"    // Testbench Template
-#include "top_mac_cvxif.h"  // Top Hardware module
+#include "Vtop_mac_cvxif.h"  // Top Hardware module
 
 /////////////////////////////////////////
 // Compile-time / Global Configuration //
@@ -50,12 +50,12 @@ int main(int argc, char* argv[]) {
         tb.tick();
     }
 
-    const bool timed_out = tb.cycle_count_() >= tb_cfg::TIMEOUT_CYCLES;
+    const bool timed_out = cycle_count_ >= tb_cfg::TIMEOUT_CYCLES;
     std::cout << "[tb] Simulation Finished after " << tb.cycle_count_
           << " cycles" << (timed_out ? " (TIMEOUT)" : "") << "\n";
 
     if (tb.fail_count_ == 0) {
-        std::cout << "[PASS] All Test Cases Passed!" << std::endl
+        std::cout << "[PASS] All Test Cases Passed!" << std::endl;
     } else {
         std::cerr << "[FAIL] " << tb.fail_count_ << " check(s) failed" << std::endl;
     }
