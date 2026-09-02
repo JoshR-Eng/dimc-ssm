@@ -30,7 +30,7 @@ module mac #(
   output logic [(DATA_WIDTH * 2)-1:0] result_o
 );
 
-assign ready_o = ready_i
+assign ready_o = ready_i;
 
 // --- 1. MULTIPLIER
 logic [(DATA_WIDTH * 2)-1:0] mult_product_d, mult_product_q;

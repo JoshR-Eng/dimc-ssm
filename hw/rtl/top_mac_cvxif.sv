@@ -23,9 +23,9 @@ module top_mac_cvxif #(
   input  logic [DATA_WIDTH-1:0] issue_rs1_i,
   input  logic [DATA_WIDTH-1:0] issue_rs2_i,
   // Host Result Interface (From Coprocessor)
-  output logic                  results_valid_o,
-  input  logic                  results_ready_i,
-  output logic [DATA_WIDTH-1:0] results_data_o,
+  output logic                        result_valid_o,
+  input  logic                        result_ready_i,
+  output logic [(DATA_WIDTH * 2)-1:0] result_data_o,
   // *TEMPORARY* Control Flags for Dummy MAC
   input logic issue_clear_i
 );
@@ -41,9 +41,9 @@ logic [DATA_WIDTH-1:0] issue_mac_rs1;
 logic [DATA_WIDTH-1:0] issue_mac_rs2;
 
 // MAC <-> Results wires
-logic                  mac_res_valid;
-logic                  mac_res_ready;
-logic [DATA_WIDTH-1:0] mac_res_data;
+logic                        mac_res_valid;
+logic                        mac_res_ready;
+logic [(DATA_WIDTH * 2)-1:0] mac_res_data;
 
 
 /////////////////////////
@@ -101,3 +101,5 @@ cvxif_result_stage #(
   .result_ready_i (result_ready_i),
   .result_data_o  (result_data_o)
 );
+
+endmodule

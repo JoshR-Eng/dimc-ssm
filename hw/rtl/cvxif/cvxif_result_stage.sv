@@ -18,12 +18,12 @@ module cvxif_result_stage #(
   input logic clk_i,
   input logic rst_ni,
   // Host Inteface
-  output logic [(DATA_WIDTH * 2)-1:0] results_data_o,
-  output logic                        results_valid_o, // Coprocessor ready to offload data
-  input  logic                        results_ready_i, // Host ready for data
+  output logic [(DATA_WIDTH * 2)-1:0] result_data_o,
+  output logic                        result_valid_o, // Coprocessor ready to offload data
+  input  logic                        result_ready_i, // Host ready for data
   // MAC
   input  logic                        mac_valid_i,
-  input  logic [(DATA_WIDTH * 2)-1:0] mac_results_i,
+  input  logic [(DATA_WIDTH * 2)-1:0] mac_result_i,
   output logic                        mac_ready_o
 );
 
