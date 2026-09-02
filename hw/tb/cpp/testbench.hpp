@@ -23,10 +23,10 @@ class Testbench {
                   double clk_period_ns = 10.0,
                   uint64_t max_cycles = 200,
                   const char* trace_file = "waveform.fst" )
-                : clk_period_ns_(clk_period_ns),
+                : context_(std::make_unique<VerilatedContext>()),
+                  clk_period_ns_(clk_period_ns),
                   max_cycles_(max_cycles),
-                  trace_file_(trace_file),
-                  context_(std::make_unique<VerilatedContext>()) {
+                  trace_file_(trace_file) {
 
             context_->commandArgs(argc, argv);
             context_->randReset(2);
