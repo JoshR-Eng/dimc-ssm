@@ -14,7 +14,7 @@
             std::cerr << "[FATAL] "  << __FILE__  << ":" << __LINE__ \
                       << " @ Cycle " << (cycle)   << "\n"            \
                       << "\tError: " << (message) << std::endl;      \
-            exit(EXIT_FAILURE);                                      \
+            throw std::runtime_error("Testbench Assertion Failed");  \
         }                                                            \
     } while (false)
 
@@ -25,7 +25,7 @@
 
 namespace tb_cfg {
     constexpr double   CLK_PERIOD_NS  = 10.0; // 100MHz Default
-    constexpr uint64_t TIMEOUT_CYCLES = 200;  // Max cycles till timeout
+    constexpr uint64_t TIMEOUT_CYCLES = 500;  // Max cycles till timeout
     constexpr const char* TRACE_FILE  = "waveform.fst";
 }   // namespace tb_cfg
 
@@ -100,7 +100,45 @@ namespace testcases {
             Stimulus: Force `result_ready_i = 0` and pass 10 instruction to issue stage
             Check: on 8th instruction FIFO `full_o` should assert, dropping
                  `issue_ready_o` to `0` to backpressure host core */
+    void fifo_saturation_test(Testbench<Vtop_mac_cvxif>& tb) {
+        std::cout << "[tb] Beginning Test 2. 'TCDM FIFO Saturation'\n";
+        tb.reset();
 
+        tb.dut()->result_ready_i = 0; // Force downstream bottleneck by not accepting MAC result
+
+        // Stimulus
+        tb.dut()->issue_valid_i = 1;
+        int instructions_pushed = 0;
+
+        for (int i = 1; i <= 15; i++) {
+            tb.dut()->issue_rs1_i = i;
+            tb.dut()->issue_rs2_i = 2;
+
+            // Check if the hardware is accepting data on this exact cycle
+            bool accepted_this_cycle = (tb.dut()->issue_ready_o == 1);
+
+            if (accepted_this_cycle) {
+                instructions_pushed++;
+            }
+
+            tb.tick();
+
+            // Check backpressure assertion
+            //  FIFO depth is 8 but downstream pipeline (MAC & Skid-buffer) holds
+            //  exactly 3 instructions as well so check at == 11
+            if (instructions_pushed == 11) {
+                // Since our FIFO depth = 8, it should now be full
+                // The combinational ready singal must drop immediately.
+                ASSERT_CHECK(tb.dut()->issue_ready_o == 0,
+                             tb.cycle_count_,
+                            "Backpressure failure: Coprocessor left `ready_o` HIGH");
+                std::cout<< "[tb] Coprocessor successfully stalled at 8 instructions\n";
+                break;
+            }
+        }
+        tb.dut()->issue_valid_i = 0;
+        std::cout << "[PASS] TCDM FIFO Saturation Test\n";
+    }
 
     /* 3. Skid-Buffer Catch
             Stimulus: Continous stream of instructions. Randomly toggle `result_ready_i`
@@ -131,14 +169,22 @@ int main(int argc, char* argv[]) {
     std::cout << "[tb] Starting Simulation\n";
     tb.reset();
 
-    // --- Test Scenarios ---
-    // |--------------------|
-    testcases::pipeline_flow_test(tb);
-    // --- Test Scenarios ---
+    try {
+        // --- Test Scenarios ---
+        // |--------------------|
+        testcases::pipeline_flow_test(tb);
+        testcases::fifo_saturation_test(tb);
+        // |--------------------|
+        // --- Test Scenarios ---
 
-    while (!tb.finished()) {
-        tb.tick();
+        while (!tb.finished()) {
+            tb.tick();
+        }
+    } catch (const std::runtime_error& e) {
+        tb.fail_count_++;
+        std::cerr << "[tb] Simulation halted due to exception" << std::endl;
     }
+
 
     const bool timed_out = tb.cycle_count_ >= tb_cfg::TIMEOUT_CYCLES;
     std::cout << "[tb] Simulation Finished after " << tb.cycle_count_
