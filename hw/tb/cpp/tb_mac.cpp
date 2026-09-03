@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <queue>
 
 #include "testbench.hpp"    // Testbench Template
 #include "Vtop_mac_cvxif.h"  // Top Hardware module
@@ -43,36 +44,63 @@ namespace testcases {
         std::cout << "[tb] Beginning Test 1. 'Unimpeded Pipeline Flow'\n";
         tb.reset();
 
-        // Test Inputs
-        static uint32_t test_rs1 = 5;
-        static uint32_t test_rs2 = 4;
-        static uint32_t expected_sum = test_rs1 * test_rs2;
+        // A Struct used to store the desired data and a cycle timestamp in the queue
+        struct Transaction {
+            uint32_t expected_data;
+            uint64_t injection_cycle;
+        };
 
-        // Stimulus
-        tb.dut()->issue_rs1_i = test_rs1;
-        tb.dut()->issue_rs2_i = test_rs2;
-        tb.dut()->issue_valid_i = 1;
+        std::queue<Transaction> scoreboard;    // Init model scoreboard
+
+        // Stimuls (Stream in multiple inputs)
         tb.dut()->result_ready_i = 1;
 
-        tb.tick();                      // Advance 1 Cycle
-        tb.dut()->issue_valid_i = 0;    // Clear stimulus
-        tb.tick();                      // advance pipeline by 2 cycles
-        tb.tick();
+        for (uint32_t i = 1; i <= 3; ++i) {
+            uint32_t rs1 = i * 2;
+            uint32_t rs2 = 5;
+            uint32_t expected_sum = rs1 * rs2;
 
-        // Check
-        ASSERT_CHECK(tb.dut()->result_valid_o == 1,
-                     tb.cycle_count_,
-                    "Result no valid after 3 cycles.");
-        ASSERT_CHECK(tb.dut()->result_data_o == expected_sum,
-                     tb.cycle_count_,
-                    "MAC computation incorrect.");
-        std::cout << "[PASS] Pipeline Flow Test";
+            scoreboard.push({expected_sum, tb.cycle_count_}); // Push expected results into software FIFO
+
+            // Push results into hardware fifo
+            tb.dut()->issue_rs1_i = rs1;
+            tb.dut()->issue_rs2_i = rs2;
+            tb.dut()->issue_valid_i = 1;
+
+            tb.tick();
+        }
+        tb.dut()->issue_valid_i = 0; // Stop driving input
+
+        // Monitor
+        int timeout = 0;
+        while (!scoreboard.empty() && timeout <20) {
+            tb.tick();
+            timeout++;
+
+            if (tb.dut()->result_valid_o == 1) {
+                Transaction current_tx = scoreboard.front();
+                scoreboard.pop();
+
+                // Calculate latency between data ingestion and output
+                uint64_t latency = tb.cycle_count_ - current_tx.injection_cycle;
+
+                std::cout << "[tb] \tMAC Result: " << tb.dut()->result_data_o
+                          << " | Latency: " << latency << " cycles\n";
+
+                ASSERT_CHECK(tb.dut()->result_data_o == current_tx.expected_data,
+                             tb.cycle_count_,
+                            "MAC computation incorrect");
+            }
+        }
+        ASSERT_CHECK(scoreboard.empty(), tb.cycle_count_, "Pipeline swallowed data");
+        std::cout << "[PASS] Pipeline Flow Test\n";
     }
 
     /* 2. TCDM FIFO Saturation
             Stimulus: Force `result_ready_i = 0` and pass 10 instruction to issue stage
             Check: on 8th instruction FIFO `full_o` should assert, dropping
                  `issue_ready_o` to `0` to backpressure host core */
+
 
     /* 3. Skid-Buffer Catch
             Stimulus: Continous stream of instructions. Randomly toggle `result_ready_i`
