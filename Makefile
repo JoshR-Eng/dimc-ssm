@@ -36,8 +36,8 @@ sim: lint		# Compile and simulate (Auto run lint first)
 	./$(V_EXE) +trace
 
 wave:			# Open Waveform viewer
-	@echo "[INFO] Opening Fast Signal Trace in GTKWave..."
-	gtkwave $(WAVE_FILE) &
+	@echo "[INFO] Opening Fast Signal Trace in Surfer..."
+	surfer $(WAVE_FILE) &
 
 clean: 			# Clean up generated objects
 	@echo "[INFO] Cleaning build directories and waveforms..."
