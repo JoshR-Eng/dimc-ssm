@@ -65,11 +65,13 @@ namespace testcases {
             // Push results into hardware fifo
             tb.dut()->issue_rs1_i = rs1;
             tb.dut()->issue_rs2_i = rs2;
+            tb.dut()->issue_instr_i = 0x0000100B;
             tb.dut()->issue_valid_i = 1;
 
             tb.tick();
         }
         tb.dut()->issue_valid_i = 0; // Stop driving input
+        tb.dut()->issue_instr_i = 0x00000000;
 
         // Monitor
         int timeout = 0;
@@ -107,6 +109,7 @@ namespace testcases {
         tb.dut()->result_ready_i = 0; // Force downstream bottleneck by not accepting MAC result
 
         // Stimulus
+        tb.dut()->issue_instr_i = 0x0000100B;
         tb.dut()->issue_valid_i = 1;
         int instructions_pushed = 0;
 
@@ -137,6 +140,7 @@ namespace testcases {
             }
         }
         tb.dut()->issue_valid_i = 0;
+        tb.dut()->issue_instr_i = 0x00000000;
         std::cout << "[PASS] TCDM FIFO Saturation Test\n";
     }
 
@@ -180,11 +184,13 @@ namespace testcases {
 
                 tb.dut()->issue_rs1_i = rs1;
                 tb.dut()->issue_rs2_i = rs2;
+                tb.dut()->issue_instr_i = 0x0000100B;
                 tb.dut()->issue_valid_i = 1;
 
                 instructions_injected++;
             } else {
                 tb.dut()->issue_valid_i = 0;
+                tb.dut()->issue_instr_i = 0x00000000;
             }
 
             tb.tick(); // tick clock cycle
@@ -216,7 +222,7 @@ namespace testcases {
         tb.dut()->issue_rs1_i = 10;
         tb.dut()->issue_rs2_i = 10;
         tb.dut()->issue_valid_i = 1;
-        tb.dut()->issue_clear_i = 0;
+        tb.dut()->issue_instr_i = 0x00000000;;
         tb.tick();
 
         tb.dut()->issue_valid_i = 0;
@@ -234,12 +240,12 @@ namespace testcases {
         tb.dut()->issue_rs1_i = 5;
         tb.dut()->issue_rs2_i = 5;
         tb.dut()->issue_valid_i = 1;
-        tb.dut()->issue_clear_i = 1;
+        tb.dut()->issue_instr_i = 0x0000100B; // Triggers the mac.clear decoder
         tb.tick(); // Latch the input
 
         // Drop the stimulus
         tb.dut()->issue_valid_i = 0;
-        tb.dut()->issue_clear_i = 0;
+        tb.dut()->issue_instr_i = 0x00000000;;
 
         // Monitor the output
         timeout = 0;
