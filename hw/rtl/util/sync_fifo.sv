@@ -16,16 +16,14 @@ module sync_fifo#(
   parameter int unsigned DEPTH       = 8,
   parameter int unsigned DATA_WIDTH  = 32
 ) (
-  input                     clk_i,
-  input                     rst_ni,
-  input                     push_i,
-  input                     pop_i,
-  input   [DATA_WIDTH-1:0]  r1_i,
-  input   [DATA_WIDTH-1:0]  r2_i,
-  output  [DATA_WIDTH-1:0]  r1_o,
-  output  [DATA_WIDTH-1:0]  r2_o,
-  output                    full_o,
-  output                    empty_o
+  input                   clk_i,
+  input                   rst_ni,
+  input                   push_i,
+  input                   pop_i,
+  input  [DATA_WIDTH-1:0] data_i,
+  output [DATA_WIDTH-1:0] data_o,
+  output                  full_o,
+  output                  empty_o
 );
 
 // --- Local Variable declaration
@@ -35,7 +33,8 @@ logic [PTR_WIDTH-1:0] wr_ptr_d, wr_ptr_q;
 logic [PTR_WIDTH-1:0] rd_ptr_d, rd_ptr_q;
 logic [PTR_WIDTH-2:0] wr_addr;
 logic [PTR_WIDTH-2:0] rd_addr;
-logic [(DATA_WIDTH * 2)-1:0] mem_q [0:DEPTH-1]; // FIFO Memory Array
+
+logic [DATA_WIDTH-1:0] mem_q [0:DEPTH-1]; // FIFO Memory Array
 
 
 // --- Pointer Slicing (Seperate Address & Empty/Full Flags)
@@ -49,7 +48,7 @@ assign full_o  = (wr_ptr_q[PTR_WIDTH-1]   != rd_ptr_q[PTR_WIDTH-1]) &&
 
 
 // --- Continous Output Read (FWFT FIFO)
-assign {r1_o, r2_o} = mem_q[rd_addr];
+assign data_o = mem_q[rd_addr];
 
 
 // --- Increment Pointer LOgic
@@ -77,7 +76,7 @@ always_ff @(posedge clk_i or negedge rst_ni) begin: ptr_registers
 
     // Push memory into FIFO
     if (push_i && !full_o) begin
-      mem_q[wr_addr] <= {r1_i, r2_i};
+      mem_q[wr_addr] <= data_i;
     end
   end
 end

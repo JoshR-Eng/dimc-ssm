@@ -22,40 +22,71 @@ module cvxif_issue_stage #(
   // Host Interface
   input   logic                   issue_valid_i,    // Host offlead request valid
   output  logic                   issue_ready_o,    // Coprocessor accept ready
+  /* verilator lint_off UNUSEDSIGNAL */
+  input   logic [31:0]            issue_instr_i,    // 32-bit RISC-V Instruction
+  /* verilator lint_on UNUSEDSIGNAL */
   input   logic [DATA_WIDTH-1:0]  issue_rs1_i,      // Instruction Operand 1
   input   logic [DATA_WIDTH-1:0]  issue_rs2_i,      // Instruction Operand 2
   // Coprocessor MAC Interface (dummy MAC for this v0.1 phase)
   input   logic                   mac_ready_i,
   output  logic [DATA_WIDTH-1:0]  mac_rs1_o,
   output  logic [DATA_WIDTH-1:0]  mac_rs2_o,
+  output  logic                   mac_clear_o,
   output  logic                   mac_valid_o
 );
 
+  // --- Payload Definition
+  typedef struct packed {
+    logic [DATA_WIDTH-1:0] rs1_data;
+    logic [DATA_WIDTH-1:0] rs2_data;
+    logic                  clear_accum;
+  } issue_payload_t;
+
+  issue_payload_t fifo_data_in, fifo_data_out;
+
+  // --- Instruction Decoder
+  logic is_custom_opcode;
+  logic is_clear_funct3;
+
+  always_comb begin : instruction_decode
+    // Use RISC-V custom instruction CUSTOM-O (0x0B) and Funct3 = 1
+    is_custom_opcode = (issue_instr_i[6:0]    == 7'h0B);
+    is_clear_funct3  = (issue_instr_i[14:12]  == 3'h1);
+    // Pack the struct for the FIFO
+    fifo_data_in.rs1_data    = issue_rs1_i;
+    fifo_data_in.rs2_data    = issue_rs2_i;
+    fifo_data_in.clear_accum = (is_custom_opcode & is_clear_funct3);
+  end
+
+
+  // --- Handshake Logic
   logic fifo_full;
   logic fifo_empty;
 
-  // --- Handshake Logic
   // Coprocessor ready to accept new instruction as long as FIFO isn't full
   assign issue_ready_o = ~fifo_full;
 
-  // --- MAC Control
   //  MAC has valid data to compute if FIFO not empty
   assign mac_valid_o = ~fifo_empty;
 
 
+  // --- Payload Extraction
+  // Unpack struct for MAC engine
+  assign mac_rs1_o   = fifo_data_out.rs1_data;
+  assign mac_rs2_o   = fifo_data_out.rs2_data;
+  assign mac_clear_o = fifo_data_out.clear_accum;
+
   // --- FIFO Instantiation
   sync_fifo #(
     .DEPTH(8),
-    .DATA_WIDTH(DATA_WIDTH)
+    .DATA_WIDTH($bits(issue_payload_t))
   ) i_instruction_fifo (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
-    .r1_i     (issue_rs1_i),
-    .r2_i     (issue_rs2_i),
+    .data_i   (fifo_data_in),
     .push_i   (issue_valid_i & issue_ready_o),
     .pop_i    (mac_valid_o & mac_ready_i),
-    .r1_o     (mac_rs1_o),
-    .r2_o     (mac_rs2_o),
+    .data_o   (fifo_data_out),
     .full_o   (fifo_full),
     .empty_o  (fifo_empty)
   );

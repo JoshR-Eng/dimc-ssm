@@ -20,14 +20,13 @@ module top_mac_cvxif #(
   // Host Issue Interface (From CV32E40X)
   input  logic                  issue_valid_i,
   output logic                  issue_ready_o,
+  input  logic [31:0]           issue_instr_i, // Standard RISC-V Instruction
   input  logic [DATA_WIDTH-1:0] issue_rs1_i,
   input  logic [DATA_WIDTH-1:0] issue_rs2_i,
   // Host Result Interface (From Coprocessor)
   output logic                        result_valid_o,
   input  logic                        result_ready_i,
-  output logic [(DATA_WIDTH * 2)-1:0] result_data_o,
-  // *TEMPORARY* Control Flags for Dummy MAC
-  input logic issue_clear_i
+  output logic [(DATA_WIDTH * 2)-1:0] result_data_o
 );
 
 ///////////////////////////////
@@ -37,6 +36,7 @@ module top_mac_cvxif #(
 // Issue <-> MAC wires
 logic                  issue_mac_valid;
 logic                  issue_mac_ready;
+logic                  issue_mac_clear;
 logic [DATA_WIDTH-1:0] issue_mac_rs1;
 logic [DATA_WIDTH-1:0] issue_mac_rs2;
 
@@ -59,11 +59,13 @@ cvxif_issue_stage #(
   // Host pins
   .issue_valid_i (issue_valid_i),
   .issue_ready_o (issue_ready_o),
+  .issue_instr_i (issue_instr_i),
   .issue_rs1_i   (issue_rs1_i),
   .issue_rs2_i   (issue_rs2_i),
   // Internal MAC pins
   .mac_valid_o   (issue_mac_valid),
   .mac_ready_i   (issue_mac_ready),
+  .mac_clear_o   (issue_mac_clear),
   .mac_rs1_o     (issue_mac_rs1),
   .mac_rs2_o     (issue_mac_rs2)
 );
@@ -77,7 +79,7 @@ mac #(
   // Control Handshake
   .valid_i       (issue_mac_valid),
   .ready_o       (issue_mac_ready),
-  .clear_accum_i (issue_clear_i),
+  .clear_accum_i (issue_mac_clear),
   .ready_i       (mac_res_ready),
   .valid_o       (mac_res_valid),
   // Data Payload
