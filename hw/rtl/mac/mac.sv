@@ -35,6 +35,7 @@ assign ready_o = ready_i;
 // --- 1. MULTIPLIER
 logic [(DATA_WIDTH * 2)-1:0] mult_product_d, mult_product_q;
 logic                        mult_valid_q;
+logic                        clear_accum_q;
 
 assign mult_product_d = rs1_i * rs2_i;
 
@@ -42,9 +43,14 @@ always_ff @(posedge clk_i or negedge rst_ni) begin : read_memory
   if (!rst_ni) begin
     mult_product_q <= '0;
     mult_valid_q   <= 1'b0;
+    clear_accum_q  <= 1'b0;
   end else if (ready_i) begin
-    mult_product_q <= mult_product_d;
+    if (valid_i) begin
+      mult_product_q <= mult_product_d;
+    end
+
     mult_valid_q   <= valid_i;
+    clear_accum_q  <= clear_accum_i;
   end
 end
 
@@ -52,9 +58,7 @@ end
 // --- 2. ACCUMULATE
 logic [(DATA_WIDTH * 2)-1:0] accum_sum_d, accum_sum_q;
 logic                        accum_valid_q;
-logic clear_accum_d, clear_accum_q;
 
-assign clear_accum_d = clear_accum_i;
 
 always_comb begin : accumulate_update
   // Default: Hold current State
@@ -65,7 +69,7 @@ always_comb begin : accumulate_update
     if (clear_accum_q) begin
       accum_sum_d = mult_product_q;
     end else begin
-      accum_sum_d = accum_sum_q + mult_valid_q;
+      accum_sum_d = accum_sum_q + mult_product_q;
     end
   end
 end
@@ -74,11 +78,11 @@ always_ff @( posedge clk_i or negedge rst_ni ) begin : accumulate
   if (!rst_ni) begin
     accum_sum_q   <= '0;
     accum_valid_q <= 1'b0;
-    clear_accum_q <= '0;
   end else if (ready_i) begin
-    accum_sum_q   <= accum_sum_d;
+    if (mult_valid_q) begin
+      accum_sum_q   <= accum_sum_d;
+    end
     accum_valid_q <= mult_valid_q;
-    clear_accum_q <= clear_accum_d;
   end
 end
 
