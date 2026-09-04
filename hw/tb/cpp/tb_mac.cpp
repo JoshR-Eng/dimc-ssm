@@ -2,8 +2,8 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <string>
 #include <queue>
+#include <random>
 
 #include "testbench.hpp"    // Testbench Template
 #include "Vtop_mac_cvxif.h"  // Top Hardware module
@@ -145,12 +145,115 @@ namespace testcases {
                       low for random intervals (1-5 cycles)
             Check: `mac_ready_o` should drop, MAC pipeline freezes and NO operand
                     data is dropped or overwritten */
+    void skid_buffer_test(Testbench<Vtop_mac_cvxif>& tb) {
+        std::cout << "[tb] Beginning Test 3. 'Skid-Buffer Catch'\n";
+        tb.reset();
+
+        // Setup Random toggle
+        std::mt19937 rng(1);
+        std::uniform_int_distribution<int> stall_duration_dist(1,5); // 1 to 5 cycles
+        std::uniform_int_distribution<int> stall_chance(1, 100);     // Precentage roll
+
+        std::queue<uint32_t> scoreboard; // Setup software FIFO
+
+        int stall_timer = 0;
+        int instructions_injected = 0;
+        const int max_instructions = 50;
+
+        // Inject random Stimulus
+        while (instructions_injected < max_instructions || !scoreboard.empty()) {
+            // Stalling - Host randomly stops accepting MAC results
+            if (stall_timer > 0) {
+                tb.dut()->result_ready_i = 0;   // Apply backpressure
+                stall_timer--;
+            } else {
+                tb.dut()->result_ready_i = 1;   // Release backpressure
+                if (stall_chance(rng) <= 20) {  // 20% chance to trigger stall next cycle
+                    stall_timer = stall_duration_dist(rng);
+                }
+            }
+            // Simulus - Inject instructions
+            if (instructions_injected < max_instructions && tb.dut()->issue_ready_o == 1) {
+                uint32_t rs1 = instructions_injected + 1; // to make sure each cycle is unqiue data
+                uint32_t rs2 = 5;
+                scoreboard.push(rs1 * rs2);
+
+                tb.dut()->issue_rs1_i = rs1;
+                tb.dut()->issue_rs2_i = rs2;
+                tb.dut()->issue_valid_i = 1;
+
+                instructions_injected++;
+            } else {
+                tb.dut()->issue_valid_i = 0;
+            }
+
+            tb.tick(); // tick clock cycle
+
+            // Check
+            if (tb.dut()->result_valid_o == 1 && tb.dut()->result_ready_i == 1) {
+                ASSERT_CHECK(!scoreboard.empty(), tb.cycle_count_,
+                            "Hardware output data but scoreboard is empty");
+                uint32_t expected = scoreboard.front();
+                scoreboard.pop();
+                ASSERT_CHECK(tb.dut()->result_data_o == expected, tb.cycle_count_,
+                            "Data Corruption - Skid-bufer overwrote or dropped data");
+            }
+        }
+        std::cout << "[PASS] Skid-Buffer Test\n";
+    }
 
     /* 4. State Persistence & Initilisation
             Stimulus: Assert `issue_clear_i` concurrent with with valid instruction
             Check: Accumulator should wipe previous state and begin fresh accumulation
                    exactly on the clock cycle new data arrives at stage 2
     */
+    void state_persistence_test(Testbench<Vtop_mac_cvxif>& tb) {
+        std::cout << "[tb] Beginning Test 4. 'State Persistence & Initilisation'\n";
+        tb.reset();
+
+        // Force a known dirty state to prime the Accumulator
+        tb.dut()->result_ready_i = 1;
+        tb.dut()->issue_rs1_i = 10;
+        tb.dut()->issue_rs2_i = 10;
+        tb.dut()->issue_valid_i = 1;
+        tb.dut()->issue_clear_i = 0;
+        tb.tick();
+
+        tb.dut()->issue_valid_i = 0;
+
+        // Keep cycling the pipeline until calculation emerges
+        int timeout = 0;
+        while (tb.dut()->result_valid_o == 0 && timeout < 20) {
+            tb.tick();
+            timeout++;
+        }
+
+        tb.tick(); // Tick once more to ensure skid-buffer drops old data
+
+        // Attempting to Clear and Inject the MAC Simulataneously
+        tb.dut()->issue_rs1_i = 5;
+        tb.dut()->issue_rs2_i = 5;
+        tb.dut()->issue_valid_i = 1;
+        tb.dut()->issue_clear_i = 1;
+        tb.tick(); // Latch the input
+
+        // Drop the stimulus
+        tb.dut()->issue_valid_i = 0;
+        tb.dut()->issue_clear_i = 0;
+
+        // Monitor the output
+        timeout = 0;
+        while(tb.dut()->result_valid_o == 0 && timeout < 20) {
+            tb.tick();
+            timeout++;
+        }
+        // If the hardware succeded, it should only output the results of the second injection (25)
+        // If it failed then it'll accumulate the initial dirty state & second injection (125)
+        ASSERT_CHECK(tb.dut()->result_data_o == 25, tb.cycle_count_,
+                     "Accumulator failed to synchronise clear," \
+                     "Output contaminated by previous state");
+        std::cout << "[PASS] State Persistance & Initilisation Test\n";
+    }
 }
 
 
@@ -174,6 +277,8 @@ int main(int argc, char* argv[]) {
         // |--------------------|
         testcases::pipeline_flow_test(tb);
         testcases::fifo_saturation_test(tb);
+        testcases::skid_buffer_test(tb);
+        testcases::state_persistence_test(tb);
         // |--------------------|
         // --- Test Scenarios ---
 
