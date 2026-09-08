@@ -36,6 +36,7 @@ module cvxif_issue_stage #(
 );
 
   // --- Payload Definition
+  localparam int unsigned PAYLOAD_WIDTH = 1 + (DATA_WIDTH * 2);
   typedef struct packed {
     logic [DATA_WIDTH-1:0] rs1_data;
     logic [DATA_WIDTH-1:0] rs2_data;
@@ -79,7 +80,7 @@ module cvxif_issue_stage #(
   // --- FIFO Instantiation
   sync_fifo #(
     .DEPTH(8),
-    .DATA_WIDTH($bits(issue_payload_t))
+    .DATA_WIDTH(PAYLOAD_WIDTH)
   ) i_instruction_fifo (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
