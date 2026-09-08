@@ -77,19 +77,24 @@ module cvxif_issue_stage #(
   assign mac_rs2_o   = fifo_data_out.rs2_data;
   assign mac_clear_o = fifo_data_out.clear_accum;
 
-  // --- FIFO Instantiation
-  sync_fifo #(
+// --- FIFO Instantiation
+  async_fifo #(
     .DEPTH(8),
-    .DATA_WIDTH(PAYLOAD_WIDTH)
+    .DATA_WIDTH(PAYLOAD_WIDTH) // Passes the calculated struct width
   ) i_instruction_fifo (
-    .clk_i    (clk_i),
-    .rst_ni   (rst_ni),
-    .data_i   (fifo_data_in),
-    .push_i   (issue_valid_i & issue_ready_o),
-    .pop_i    (mac_valid_o & mac_ready_i),
-    .data_o   (fifo_data_out),
-    .full_o   (fifo_full),
-    .empty_o  (fifo_empty)
+    // Host (Write) Domain
+    .wr_clk_i   (clk_i),       // Temporarily tied to system clock
+    .wr_rst_ni  (rst_ni),      // Temporarily tied to system reset
+    .push_i     (issue_valid_i & issue_ready_o),
+    .data_i     (fifo_data_in),
+    .full_o     (fifo_full),
+
+    // Coprocessor (Read) Domain
+    .rd_clk_i   (clk_i),       // Temporarily tied to system clock
+    .rd_rst_ni  (rst_ni),      // Temporarily tied to system reset
+    .pop_i      (mac_valid_o & mac_ready_i),
+    .data_o     (fifo_data_out),
+    .empty_o    (fifo_empty)
   );
 
 endmodule
