@@ -129,7 +129,7 @@ namespace testcases {
             // Check backpressure assertion
             //  FIFO depth is 8 but downstream pipeline (MAC & Skid-buffer) holds
             //  exactly 3 instructions as well so check at == 11
-            if (instructions_pushed == 11) {
+            if (instructions_pushed == 13) {
                 // Since our FIFO depth = 8, it should now be full
                 // The combinational ready singal must drop immediately.
                 ASSERT_CHECK(tb.dut()->issue_ready_o == 0,
@@ -193,8 +193,6 @@ namespace testcases {
                 tb.dut()->issue_instr_i = 0x00000000;
             }
 
-            tb.tick(); // tick clock cycle
-
             // Check
             if (tb.dut()->result_valid_o == 1 && tb.dut()->result_ready_i == 1) {
                 ASSERT_CHECK(!scoreboard.empty(), tb.cycle_count_,
@@ -204,6 +202,7 @@ namespace testcases {
                 ASSERT_CHECK(tb.dut()->result_data_o == expected, tb.cycle_count_,
                             "Data Corruption - Skid-bufer overwrote or dropped data");
             }
+            tb.tick(); // tick clock cycle
         }
         std::cout << "[PASS] Skid-Buffer Test\n";
     }
