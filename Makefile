@@ -12,15 +12,16 @@ CPP_TB	   := $(TB_DIR)/tb_mac.cpp
 
 
 # --- Toolchain ---
-VERILATOR  := verilator
-LINT_FLAGS := --lint-only -Wall
-SIM_FLAGS  := -Wall --trace-fst --cc --exe --build -j 0 --top-module $(TOP_MODULE)
-V_EXE	   := obj_dir/V$(TOP_MODULE)
-WAVE_FILE  := waveform.fst
+VERILATOR   := verilator
+LINT_FLAGS  := --lint-only -Wall
+SIM_FLAGS   := -Wall --trace-fst --cc --exe --build -j 0 --top-module $(TOP_MODULE)
+V_EXE	    := obj_dir/V$(TOP_MODULE)
+WAVE_FILE   := waveform.fst
+REPORT_FILE := reports/mamba_cvxif_area.txt
 
 
 # --- Commands ---
-.PHONY: all lint sim wave clean
+.PHONY: all lint sim wave synth clean
 
 all: lint		# Default target
 
@@ -38,6 +39,12 @@ sim: lint		# Compile and simulate (Auto run lint first)
 wave:			# Open Waveform viewer
 	@echo "[INFO] Opening Fast Signal Trace in Surfer..."
 	surfer $(WAVE_FILE) &
+
+synth: 			# Use Yosys to map the SystemVerilog to generic gates
+	@echo "[INFO] Running Yosys Synthesis for Area Estimation"
+	@mkdir -p ./reports
+	yosys -p "read_verilog -sv $(SV_SOURCES); synth -top $(TOP_MODULE); stat" | tee $(REPORT_FILE)
+	@echo "[INFO] Synthesis Complete. Report saved to $(REPORT_FILE)"
 
 clean: 			# Clean up generated objects
 	@echo "[INFO] Cleaning build directories and waveforms..."
