@@ -68,7 +68,7 @@ always_comb begin
     valid_d[1] = 1'b0;
   end
 
-  // Handle SRAM Push (Shift Up)
+  // Handle SRAM Push
   if (sram_data_valid_q) begin
     if (valid_d[0] == 1'b0) begin
       valid_d[0] = 1'b1;

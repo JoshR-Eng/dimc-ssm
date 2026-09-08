@@ -21,6 +21,7 @@ module async_fifo#(
   // Host (Write)
   input                   wr_clk_i,
   input                   wr_rst_ni,
+  input                   flush_i,
   input                   push_i,
   input  [DATA_WIDTH-1:0] data_i,
   output                  full_o,
