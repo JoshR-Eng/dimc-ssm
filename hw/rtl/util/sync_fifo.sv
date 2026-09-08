@@ -5,7 +5,7 @@
 /////////////////////////////////////////////////////////////////////////////////////
 // Engineer:        Josh Rawlinson - joshrawlinson05@outlook.com
 // Date:            2026-08-22
-// Design Name:     FIFO
+// Design Name:     [DEPRECIATED] FIFO
 // Description:
 //   Simple FIFO module
 //   Primary implementation is to store instruction operands
