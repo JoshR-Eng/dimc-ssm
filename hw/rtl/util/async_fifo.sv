@@ -21,7 +21,6 @@ module async_fifo#(
   // Host (Write)
   input                   wr_clk_i,
   input                   wr_rst_ni,
-  input                   flush_i,
   input                   push_i,
   input  [DATA_WIDTH-1:0] data_i,
   output                  full_o,
@@ -43,6 +42,8 @@ logic [DATA_WIDTH-1:0] mem_q [0:DEPTH-1]; // FIFO Memory Array
 logic [PTR_WIDTH-1:0] wr_ptr_bin_q, wr_ptr_bin_d;
 logic [PTR_WIDTH-1:0] wr_ptr_gray_q, wr_ptr_gray_d;
 logic [PTR_WIDTH-2:0] wr_addr;
+
+assign wr_addr = wr_ptr_bin_q[PTR_WIDTH-2:0];
 
 always_comb begin
   wr_ptr_bin_d = wr_ptr_bin_q;
