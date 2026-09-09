@@ -3,3 +3,4 @@ obj_dir/
 .vscode/settings.json
 waveform.fst.hier
 waveform.fst
+archive/*
