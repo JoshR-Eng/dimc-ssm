@@ -4,3 +4,4 @@ obj_dir/
 waveform.fst.hier
 waveform.fst
 archive/*
+model/ssm_model/__pycache__/*
