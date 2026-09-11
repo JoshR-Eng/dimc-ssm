@@ -1,0 +1,53 @@
+"""
+ENGINEER:       Josh Rawlinson - joshrawlinson05@outlook.com
+DATE:           09.09.26
+DESCRIPTION:
+    Recurrence Logic for S4 SSM model
+"""
+import numpy as np
+
+def s4_recurrence_float(x_seq: np.ndarray,
+                        A_bar: np.ndarray, B_bar: np.ndarray,
+                        C_bar: np.ndarray, D_bar: np.ndarray) -> np.ndarray:
+    """
+    Basic recurrent function with no contraint to bit length
+    and no quantisation
+    """
+    h = np.zeros(np.size(A_bar))
+    y_seq = []
+    for x_t in x_seq:
+        h = A_bar * h + B_bar * x_t
+        y_t = np.sum(C_bar * h) + (D_bar * x_t)
+        y_seq.append(y_t)
+    y_seq = np.array(y_seq)
+    return y_seq
+
+def quantise(x, frac_bits, total_bits):
+    scale = 1 << frac_bits
+    q_min, q_max = -(1 << (total_bits -1)), (1 << (total_bits -1)) - 1
+    return np.clip(np.round(x * scale), q_min, q_max).astype(np.int64)
+
+def s4_recurrence_fixed(x_seq, A_bar_q, B_bar_q, C_q, D_q,
+                        coeff_frac_bits, state_frac_bits, total_bits):
+    """
+    S4 Recurrence function with contained bit sizes
+    and quantisation
+    """
+    h_q = np.zeros_like(A_bar_q, dtype=np.int64)
+    y_seq = []
+    for x_t_q in x_seq:
+        # Multiply: int*int -> double width int
+        Ah = A_bar_q * h_q
+        Bx = B_bar_q * x_t_q
+
+        # Re-scale back down to state_frac_bits and saturate to total_bits
+        # This Implements 'truncation-after-multiply'
+        h_raw = (Ah + Bx) >> coeff_frac_bits
+        h_q = np.clip(h_raw, -(1 << (total_bits - 1)), (1 << (total_bits - 1)) - 1)
+
+        # Reduce across channels:
+        # use wider (int64) accumulator before any final rounding - models adder tree's gaurd bits
+        y_acc = np.sum((C_q * h_q).astype(np.int64)) + D_q * x_t_q
+        y_seq.append(y_acc)
+    return np.array(y_seq)
+
