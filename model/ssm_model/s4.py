@@ -8,8 +8,10 @@ DESCRIPTION:
 """
 
 import numpy as np
-import pytest
-import matplotlib.pyplot as plt
+
+from s4_tests import test_impulse_response_decays
+from s4_recurrence import s4_recurrence_float, s4_recurrence_fixed
+
 
 # --- Define Initial State Vectors
 num_channels: int = 8   # Number of parallel salar recurrences
@@ -34,22 +36,14 @@ B_bar = ((A_bar - 1.0) / A) * B     # Exact ZOH
 C_bar = C
 D_bar = D
 
+print(f"A_bar:\n{A_bar}\n\nB_bar:\n{B_bar}\n\nC:\n{C}\n\nD:\n{D}")
 
 # --- Calculate recurrence
-def s4_recurrence(x_seq: np.ndarray,
-                  A_bar: np.ndarray, B_bar: np.ndarray,
-                  C_bar: np.ndarray, D_bar: np.ndarray) -> np.ndarray:
-    h = np.zeros(np.size(A_bar))
-    y_seq = []
-    for x_t in x_seq:
-        h = A_bar * h + B_bar * x_t
-        y_t = np.sum(C_bar * h) + (D_bar * x_t)
-        y_seq.append(y_t)
-    y_seq = np.array(y_seq)
-    return y_seq
-
 x_seq = np.zeros(num_timesteps)
 x_seq[0] = 1.0                  # Impulse at t=0
-y_seq = s4_recurrence(x_seq, A_bar, B_bar, C_bar, D_bar)
-print(y_seq)
+y_seq = s4_recurrence_float(x_seq, A_bar, B_bar, C_bar, D_bar)
+print(f"\ny_seq: \n{y_seq}")
 
+
+# --- Test/Validation
+test_impulse_response_decays(y=y_seq)
