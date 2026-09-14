@@ -82,27 +82,54 @@ def _rescale(x_wide, shift, total_bits, round_mode="truncate"):
 
 
 # --- Fixed Recurrence Function
-def s4_recurrence_fixed(x_seq, A_bar_q, B_bar_q, C_q, D_q,
-                        coeff_frac_bits, state_frac_bits, total_bits):
+def s4_recurrence_fixed(x_seq_q, A_bar_q, B_bar_q, C_bar_q, D_bar_q,
+                        coeff_frac_bits, state_frac_bits, total_bits,
+                        round_mode="truncate"):
     """
-    S4 Recurrence function with contained bit sizes
-    and quantisation
+    Fixed-point S4 Recurrence, a bit-accuracte model of the DIMC datapath
+
+    All arguments should be quantised integers (call `quantise()`),
+    this matches the real hardware which never sees a float
+
+    Argument Format:
+    Design 1.0 Uniform Q3.13
+        A_bar_q, B_bar_q, C_bar_q, D_bar_q  : SSM coefficients
+        x_seq_q                             : Input Sequence
+        h_q                                 : Internal State Vector
+        y_seq_q                             : Output (Rescaled to Q3.13)
+
+    Bit Growth:
+        - State Update Multiply -> Q3.13 * Q3.13 = Q6.26
+                                 \ rescaled back down to Q3.13
+        - Channel-Reduction Sum -> N additions causes log_2(N) width growth
+                                 \ use wide int64 accumulator throughout
+                                 \ addition tree then rescale down to
+                                 \ Q3.13 before output
     """
-    h_q = np.zeros_like(A_bar_q, dtype=np.int64)
-    y_seq = []
-    for x_t_q in x_seq:
-        # Multiply: int*int -> double width int
+    num_channels = A_bar_q.size
+    h_q = np.zeros(num_channels, dtype=np.int64)
+    y_seq_q = []
+    h_trace_q = []
+
+    for x_t_q in x_seq_q:
+        # --- State Update: h = Ah + Bx
         Ah = A_bar_q * h_q
         Bx = B_bar_q * x_t_q
+        h_wide = Ah + Bx
 
-        # Re-scale back down to state_frac_bits and saturate to total_bits
-        # This Implements 'truncation-after-multiply'
-        h_raw = (Ah + Bx) >> coeff_frac_bits
-        h_q = np.clip(h_raw, -(1 << (total_bits - 1)), (1 << (total_bits - 1)) - 1)
+        h_q = _rescale(h_wide, shift=coeff_frac_bits,
+                       total_bits=total_bits, round_mode=round_mode)
 
-        # Reduce across channels:
-        # use wider (int64) accumulator before any final rounding - models adder tree's gaurd bits
-        y_acc = np.sum((C_q * h_q).astype(np.int64)) + D_q * x_t_q
-        y_seq.append(y_acc)
-    return np.array(y_seq)
 
+        # --- Output: y = sum(Ch) + Dx
+        Ch = (C_bar_q * h_q).astype(np.int64)
+        Dx = D_bar_q * x_t_q
+        y_wide = np.sum(Ch) + Dx
+
+        y_q = _rescale(y_wide, shift=coeff_frac_bits,
+                       total_bits=total_bits, round_mode=round_mode)
+
+        y_seq_q.append(y_q)
+        h_trace_q.append(h_q.copy())
+
+    return np.array(y_seq_q), np.array(h_trace_q)
