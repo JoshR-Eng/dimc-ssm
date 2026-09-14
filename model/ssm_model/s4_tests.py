@@ -9,6 +9,7 @@ import pytest
 import numpy as np
 
 from model.ssm_model.s4_recurrence import s4_recurrence_float, s4_recurrence_fixed
+from model.ssm_model.s4_analysis import sweep_worst_case
 
 @pytest.fixture
 def ssm_params():
@@ -96,9 +97,27 @@ def test_realistic_input(ssm_params):
         # Calculate and store max/min values of h to determine hardware bit structure
         max_h_per_channel = np.max(np.abs(h_trace), axis=0)
         max_y = np.max(np.abs(y))
-        np.savetxt("model/tests/max_h_per_channel.csv",
-                   max_h_per_channel, delimiter=",")
+        np.savetxt("model/tests/max_h_per_channel.csv", max_h_per_channel, delimiter=",")
         with open("model/tests/max_y.txt", "w") as f:
                 f.write(str(max_y))
 
+
+def test_worst_case_percentiles(ssm_params):
+        """
+        Performs a Monte Carlo sweep random test inputs and calculates the 99.9th percentile
+        of the results - used to help determine necessary bit allocation
+        """
+        max_h_runs, max_y_runs = sweep_worst_case(ssm_params, duration_s=3600, dt=0.1)
+
+        h_p999 = np.percentile(max_h_runs, 99.9, axis=0)
+        h_p977 = np.percentile(max_h_runs, 97.7, axis=0)
+        y_p999 = np.percentile(max_y_runs, 99.9)
+        y_p977 = np.percentile(max_y_runs, 97.7)
+
+        np.savetxt("model/tests/h_p999_per_channel.csv", h_p999, delimiter=",")
+        np.savetxt("model/tests/h_p977_per_channel.csv", h_p977, delimiter=",")
+        with open("model/tests/y_p999.txt", "w") as f:
+                f.write(str(y_p999))
+        with open("model/tests/y_p977.txt", "w") as f:
+                f.write(str(y_p977))
 
