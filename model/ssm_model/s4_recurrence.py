@@ -8,18 +8,24 @@ import numpy as np
 
 def s4_recurrence_float(x_seq: np.ndarray,
                         A_bar: np.ndarray, B_bar: np.ndarray,
-                        C_bar: np.ndarray, D_bar: np.ndarray) -> np.ndarray:
+                        C_bar: np.ndarray, D_bar: np.ndarray,
+                        return_state_trace: bool = False) -> np.ndarray:
     """
     Basic recurrent function with no contraint to bit length
     and no quantisation
     """
     h = np.zeros(np.size(A_bar))
     y_seq = []
+    h_trace = [] if return_state_trace else None
     for x_t in x_seq:
         h = A_bar * h + B_bar * x_t
         y_t = np.sum(C_bar * h) + (D_bar * x_t)
         y_seq.append(y_t)
+        if return_state_trace:
+            h_trace.append(h.copy())
     y_seq = np.array(y_seq)
+    if return_state_trace:
+        return y_seq, np.array(h_trace)
     return y_seq
 
 def quantise(x, frac_bits, total_bits):
