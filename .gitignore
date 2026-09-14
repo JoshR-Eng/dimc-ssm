@@ -5,3 +5,4 @@ waveform.fst.hier
 waveform.fst
 archive/*
 model/ssm_model/__pycache__/*
+model/__pycache__/__init__.cpython-314.pyc
