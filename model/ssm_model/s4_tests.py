@@ -53,6 +53,11 @@ def test_impulse_response_decays(ssm_params):
 
 
 def test_dc_input_matches_steady_state(ssm_params):
+        """
+        Input a simple step input and then determine if
+        the SSM correctly decays it towards 0 and use
+        the closed-form model to use as a comparitive
+        """
         num_timesteps = 500
         x_seq = np.ones(num_timesteps)
 
@@ -67,6 +72,11 @@ def test_dc_input_matches_steady_state(ssm_params):
 
 
 def test_realistic_input(ssm_params):
+        """
+        Uses a user-defined approximate of the nominal amplitude, spike amplitude
+        and probability of a spike to determine the size & precision of each
+        variable within the SSM to determine bit allocation for hardware accelerator
+        """
         rng = np.random.default_rng(seed=1)
         num_timesteps = 500
         nominal_amplitude = 0.5
