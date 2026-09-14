@@ -6,6 +6,14 @@ DESCRIPTION:
 """
 import numpy as np
 
+
+# ==============================================================================
+# Floating Recurrence
+#       All variables are floating points, enabling high precision
+#       capable of being the comparable baseline to determine how
+#       different precisions will affect accuracy
+# ==============================================================================
+
 def s4_recurrence_float(x_seq: np.ndarray,
                         A_bar: np.ndarray, B_bar: np.ndarray,
                         C_bar: np.ndarray, D_bar: np.ndarray,
@@ -28,11 +36,34 @@ def s4_recurrence_float(x_seq: np.ndarray,
         return y_seq, np.array(h_trace)
     return y_seq
 
+
+
+
+# ==============================================================================
+# Fixed Recurrence
+#       Variables are fixed to given bit lengths
+#       this enables validation and modelling of models
+#       that could run on the SSM hardware accelerator
+# ==============================================================================
+
+# --- Quantisation & Dequantisation functions
 def quantise(x, frac_bits, total_bits):
     scale = 1 << frac_bits
     q_min, q_max = -(1 << (total_bits -1)), (1 << (total_bits -1)) - 1
     return np.clip(np.round(x * scale), q_min, q_max).astype(np.int64)
 
+def dequantise(x_q, frac_bits):
+    """
+    Quantisation is lossy - hence, this quantisation function
+    only changes the data from integer to floating-point format to enable
+    accurate comparison with floating model but its not capable of
+    returning the information loss when originally quantised
+    """
+    return x_q.astype(np.float64) / (1 << frac_bits)
+
+
+
+# --- Fixed Recurrence Function
 def s4_recurrence_fixed(x_seq, A_bar_q, B_bar_q, C_q, D_q,
                         coeff_frac_bits, state_frac_bits, total_bits):
     """
