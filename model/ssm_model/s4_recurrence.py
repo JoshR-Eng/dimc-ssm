@@ -63,6 +63,24 @@ def dequantise(x_q, frac_bits):
 
 
 
+# --- Rescale function to shorten long bit lengths to a fixed allocation
+def _rescale(x_wide, shift, total_bits, round_mode="truncate"):
+    """
+    Bring a wide intermediate (extra bits from multiple & addition)
+    back down to the working format then saturate
+    """
+    if round_mode == "truncate":
+        x_shifted = x_wide >> shift             # arithmetic shift
+    elif round_mode == "round":
+        half = 1 << (shift -1)
+        x_shifted = (x_wide + half) >> shift    # round-half-up
+    else:
+        raise ValueError(f"Unknown round_mode: {round_mode}")
+    q_min = -(1 << (total_bits - 1))
+    q_max =  (1 << (total_bits - 1)) - 1
+    return np.clip(x_shifted, q_min, q_max)
+
+
 # --- Fixed Recurrence Function
 def s4_recurrence_fixed(x_seq, A_bar_q, B_bar_q, C_q, D_q,
                         coeff_frac_bits, state_frac_bits, total_bits):
