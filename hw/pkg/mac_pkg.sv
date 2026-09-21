@@ -19,7 +19,7 @@ package mac_pkg;
   localparam int DATA_WIDTH = 32;
 
   // Coprocessor internal opcodes
-  typedef enum logic [1:0] {
+  typdef enum logic [1:0] {
     OP_NOP = 2'b00, // No Operation
     OP_MAC = 2'b01  // Dummy Multiply-Accumulate
     // Future expansion: OP_SILU, OP_EXP, etc...
