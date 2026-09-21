@@ -154,4 +154,10 @@ def test_fixed_match_float(ssm_params):
         error = np.abs(y_float - y_fixed_dequant)
         with open(f"model/tests/fix_{round_mode}_error.txt", "w") as f:
                 f.write(str(error.max()))
+        with open(f"model/vectors/x_seq_q.txt", "w") as f:
+                for x in x_seq_q:
+                        f.write(str(x) + '\n')
+        with open(f"model/vectors/y_seq_q.txt", "w") as f:
+                for y in y_seq_q:
+                        f.write(str(y) + '\n')
         assert error.max() < THRESHOLD, f"max error{error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
