@@ -152,12 +152,13 @@ def test_fixed_match_float(ssm_params):
         y_fixed_dequant = dequantise(y_seq_q, FRAC_BITS)
 
         error = np.abs(y_float - y_fixed_dequant)
-        with open(f"model/tests/fix_{round_mode}_error.txt", "w") as f:
-                f.write(str(error.max()))
-        with open(f"model/vectors/x_seq_q.txt", "w") as f:
-                for x in x_seq_q:
-                        f.write(str(x) + '\n')
-        with open(f"model/vectors/y_seq_q.txt", "w") as f:
-                for y in y_seq_q:
-                        f.write(str(y) + '\n')
+
+        # Save max error as a floating point string
+        np.savetxt(f"model/tests/fix_{round_mode}_error.txt", [error.max()], fmt="%.6f")
+
+        # Save quantized vectors as integers
+        np.savetxt("model/vectors/x_seq_q.txt", x_seq_q, fmt="%d")
+        np.savetxt("model/vectors/y_seq_q.txt", y_seq_q, fmt="%d")
+
+        assert error.max() < THRESHOLD, f"max error {error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
         assert error.max() < THRESHOLD, f"max error{error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
