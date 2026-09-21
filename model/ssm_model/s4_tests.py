@@ -8,7 +8,7 @@ DESCRIPTION:
 import pytest
 import numpy as np
 
-from model.ssm_model.s4_recurrence import s4_recurrence_float, s4_recurrence_fixed
+from model.ssm_model.s4_recurrence import s4_recurrence_float, s4_recurrence_fixed, quantise, dequantise
 from model.ssm_model.s4_analysis import sweep_worst_case
 
 @pytest.fixture
@@ -121,3 +121,37 @@ def test_worst_case_percentiles(ssm_params):
         with open("model/tests/y_p977.txt", "w") as f:
                 f.write(str(y_p977))
 
+
+def test_fixed_match_float(ssm_params):
+        """
+        Test the fixed recurrence against the floating
+        """
+        FRAC_BITS = 13
+        TOTAL_BITS = 16
+        FULL_SCALE = 2 ** (TOTAL_BITS - FRAC_BITS -1)
+        THRESHOLD = 0.02 * FULL_SCALE
+        round_mode = "round" # 'truncate' or 'round'
+
+        rng = np.random.default_rng(seed=2)
+        x_seq = 0.5 * rng.standard_normal(3600)
+        spike_mask = rng.random(3600) < 0.05
+        x_seq[spike_mask] = 0.95
+
+        y_float = s4_recurrence_float(x_seq, ssm_params["A_bar"], ssm_params["B_bar"],
+                                      ssm_params["C_bar"], ssm_params["D_bar"])
+
+        x_seq_q = quantise(x_seq, FRAC_BITS, TOTAL_BITS)
+        A_bar_q = quantise(ssm_params["A_bar"], FRAC_BITS, TOTAL_BITS)
+        B_bar_q = quantise(ssm_params["B_bar"], FRAC_BITS, TOTAL_BITS)
+        C_bar_q = quantise(ssm_params["C_bar"], FRAC_BITS, TOTAL_BITS)
+        D_bar_q = quantise(np.array(ssm_params["D_bar"]), FRAC_BITS, TOTAL_BITS)
+
+        y_seq_q, _ = s4_recurrence_fixed(x_seq_q, A_bar_q, B_bar_q, C_bar_q, D_bar_q,
+                                         coeff_frac_bits=FRAC_BITS, state_frac_bits=FRAC_BITS,
+                                         total_bits=TOTAL_BITS, round_mode=round_mode)
+        y_fixed_dequant = dequantise(y_seq_q, FRAC_BITS)
+
+        error = np.abs(y_float - y_fixed_dequant)
+        with open(f"model/tests/fix_{round_mode}_error.txt", "w") as f:
+                f.write(str(error.max()))
+        assert error.max() < THRESHOLD, f"max error{error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
