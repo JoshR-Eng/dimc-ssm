@@ -100,11 +100,11 @@ def s4_recurrence_fixed(x_seq_q, A_bar_q, B_bar_q, C_bar_q, D_bar_q,
 
     Bit Growth:
         - State Update Multiply -> Q3.13 * Q3.13 = Q6.26
-                                 \ rescaled back down to Q3.13
+                                   rescaled back down to Q3.13
         - Channel-Reduction Sum -> N additions causes log_2(N) width growth
-                                 \ use wide int64 accumulator throughout
-                                 \ addition tree then rescale down to
-                                 \ Q3.13 before output
+                                   use wide int64 accumulator throughout
+                                   addition tree then rescale down to
+                                   Q3.13 before output
     """
     num_channels = A_bar_q.size
     h_q = np.zeros(num_channels, dtype=np.int64)
