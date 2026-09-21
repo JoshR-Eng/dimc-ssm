@@ -157,8 +157,8 @@ def test_fixed_match_float(ssm_params):
         np.savetxt(f"model/tests/fix_{round_mode}_error.txt", [error.max()], fmt="%.6f")
 
         # Save quantized vectors as integers
-        np.savetxt("model/vectors/x_seq_q.txt", x_seq_q, fmt="%d")
-        np.savetxt("model/vectors/y_seq_q.txt", y_seq_q, fmt="%d")
+        np.savetxt("model/vectors/x_seq_q.txt", x_seq_q.astype(np.uint16), fmt="%d")
+        np.savetxt("model/vectors/y_seq_q.txt", y_seq_q.astype(np.uint16), fmt="%d")
 
         assert error.max() < THRESHOLD, f"max error {error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
         assert error.max() < THRESHOLD, f"max error{error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
