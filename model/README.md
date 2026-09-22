@@ -13,7 +13,7 @@ The recurrent core uses a per-channel diagonal `A` and which `A`, `B`, `C`, `D` 
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Discretization | Exact ZOH: $\bar{A} = \exp{A\Delta}$, $\bar{B} = \frac{\bar{A}-1}{A \cdot B'}$ | Affordable because `A` is diagonal — no matrix exponential needed |
+| Discretization | Exact ZOH: $\bar{A} = \exp{A\Delta}$, $\bar{B} = \frac{\bar{A}-1}{A} \cdot \cdot B'$ | Affordable because `A` is diagonal — no matrix exponential needed |
 | Number format | Uniform `Q3.13` (16-bit: 1 sign + 2 integer + 13 fractional) | Single format across coefficients, state `h`, input `x`, output `y` — simplifies the datapath, no per-signal format bookkeeping |
 | Overflow handling | Clip / saturate | Bounded, predictable failure mode vs. wraparound corrupting state silently |
 | Rounding | Round-to-nearest | Measured error 0.0028 vs. 0.0082 for truncate; truncate also has a directional (downward) bias that compounds under long feedback — round-to-nearest doesn't |
