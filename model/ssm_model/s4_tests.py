@@ -107,7 +107,7 @@ def test_worst_case_percentiles(ssm_params):
         Performs a Monte Carlo sweep random test inputs and calculates the 99.9th percentile
         of the results - used to help determine necessary bit allocation
         """
-        max_h_runs, max_y_runs = sweep_worst_case(ssm_params, duration_s=3600, dt=0.1)
+        max_h_runs, max_y_runs = sweep_worst_case(ssm_params, duration_s=3600, dt=0.01)
 
         h_p999 = np.percentile(max_h_runs, 99.9, axis=0)
         h_p977 = np.percentile(max_h_runs, 97.7, axis=0)

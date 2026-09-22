@@ -30,7 +30,7 @@ lint:			# Linting target
 	$(VERILATOR) $(LINT_FLAGS) $(SV_SOURCES) --top-module $(TOP_MODULE)
 	@echo "[PASS] RTL is clean"
 
-model:
+model:			# Runs the Golden Model test cases
 	@echo "[INFO] Running Python model of SSM"
 	python3 -m pytest model/ssm_model/s4_tests.py -v
 
