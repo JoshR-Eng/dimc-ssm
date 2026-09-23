@@ -11,13 +11,26 @@ import numpy as np
 from model.ssm_model.s4_recurrence import s4_recurrence_float, s4_recurrence_fixed, quantise, dequantise
 from model.ssm_model.s4_analysis import sweep_worst_case
 
+# --- Helper Functions
+def _export_u16(path, arr):
+        """
+        Write signed INTs as 16-bit two's complement bit
+        Useful for exporting test vectors
+        """
+        arr = np.atleast_1d(np.asanyarray(arr, dtype=np.int64))
+        np.savetxt(path, arr & 0xFFFF, fmt="%d")
+
+
+
+
+# --- Test Model Parameters
 @pytest.fixture
 def ssm_params():
         """
         Builds the set of SSM coefficients shared by every test
         """
         num_channels = 8
-        dt = 0.1
+        dt = 0.01
         tau = np.logspace(np.log10(2 * dt), np.log10(100 * dt), num_channels)
 
         A = -1.0 / tau
@@ -37,6 +50,11 @@ def ssm_params():
                 "D_bar"       : D
         }
 
+
+
+
+
+# --- Tests
 
 def test_impulse_response_decays(ssm_params):
         """
@@ -146,19 +164,24 @@ def test_fixed_match_float(ssm_params):
         C_bar_q = quantise(ssm_params["C_bar"], FRAC_BITS, TOTAL_BITS)
         D_bar_q = quantise(np.array(ssm_params["D_bar"]), FRAC_BITS, TOTAL_BITS)
 
-        y_seq_q, _ = s4_recurrence_fixed(x_seq_q, A_bar_q, B_bar_q, C_bar_q, D_bar_q,
-                                         coeff_frac_bits=FRAC_BITS, state_frac_bits=FRAC_BITS,
-                                         total_bits=TOTAL_BITS, round_mode=round_mode)
+        y_seq_q, h_trace_q = s4_recurrence_fixed(x_seq_q, A_bar_q, B_bar_q, C_bar_q, D_bar_q,
+                                                coeff_frac_bits=FRAC_BITS, state_frac_bits=FRAC_BITS,
+                                                total_bits=TOTAL_BITS, round_mode=round_mode)
         y_fixed_dequant = dequantise(y_seq_q, FRAC_BITS)
 
         error = np.abs(y_float - y_fixed_dequant)
 
-        # Save max error as a floating point string
-        np.savetxt(f"model/tests/fix_{round_mode}_error.txt", [error.max()], fmt="%.6f")
+        # Stimulus / expected outputs
+        _export_u16("model/vectors/x_seq_q.txt",     x_seq_q)
+        _export_u16("model/vectors/y_seq_q.txt",     y_seq_q)
+        _export_u16("model/vectors/h_trace_q.txt",   h_trace_q)   # shape (3600, 8) -> 3600 rows x 8 cols
 
-        # Save quantized vectors as integers
-        np.savetxt("model/vectors/x_seq_q.txt", x_seq_q.astype(np.uint16), fmt="%d")
-        np.savetxt("model/vectors/y_seq_q.txt", y_seq_q.astype(np.uint16), fmt="%d")
+        # Coefficients (loaded into the DUT by the testbench)
+        _export_u16("model/vectors/A_bar_q.txt", A_bar_q)
+        _export_u16("model/vectors/B_bar_q.txt", B_bar_q)
+        _export_u16("model/vectors/C_bar_q.txt", C_bar_q)
+        _export_u16("model/vectors/D_bar_q.txt", D_bar_q)
 
+        # Test Assertions
         assert error.max() < THRESHOLD, f"max error {error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
         assert error.max() < THRESHOLD, f"max error{error.max():.4f} exceeds {THRESHOLD:.4f} (2% of full-scale)"
