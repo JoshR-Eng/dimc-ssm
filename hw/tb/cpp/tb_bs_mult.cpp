@@ -36,7 +36,46 @@ namespace tb_cfg {
 ///////////////////////////////
 namespace testcases {
     void multiply_test(Testbench<Vtop_mac_cvxif>& tb) {
+        std::cout << "[tb] Beginning test 1. 'Multiply_test'" << std::endl
+        tb.reset();
 
+        struct Transaction {
+            uint32_t expected_data;
+            uint64_t injection_cycle;
+        };
+
+        std::queue<Transaction> scoreboard;
+
+        for (uint16_t = 0; i < 10; i++) {
+            do {
+            uint16_t a = 5;
+            uint16_t b = i;
+            uint32_t expected_prod = 5 * i;
+
+            scoreboard.push({expected_prod, tb.cycle_count_})
+
+            tb.dut()->a_i = a;
+            tb.dut()->b_i = b;
+            tb.dut()->start_i = 1;
+            } while (i < 5)
+
+            tb.tick;
+
+            if (tb.dut()->done_o == 1) {
+                Transaction current_tx = scoreboard.front()
+                scoreboard.pop()
+
+                // Calculate latency between data ingestion and output
+                uint64_t latency = tb.cycle_count_ - current_tx.injection_cycle;
+
+                std::cout << "[tb] \tBit-Serial Multiplier Result: " << tb.dut()->result_data_o
+                          << " | Latency: " << latency << " cycles\n";
+
+                ASSERT_CHECK(tb.dut()->product_o == current_tx.expected_data,
+                             tb.cycle_count_,
+                            "MAC computation incorrect");
+            }
+        }
     }
 }   // namespace testcases
 
@@ -59,7 +98,7 @@ int main(int argc, char* argv[]) {
     try {
         // --- Test Scenarios ---
         // |--------------------|
-
+        testcases::multiply_test(tb);
         // |--------------------|
         // --- Test Scenarios ---
 
