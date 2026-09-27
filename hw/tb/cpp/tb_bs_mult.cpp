@@ -23,59 +23,72 @@
 // Compile-time / Global Configuration //
 /////////////////////////////////////////
 
+// Multiplier Config
+#ifndef TB_WIDTH
+#define TB_WIDTH 16
+#endif
+constexpr uint32_t OPERAND_MASK = (1u << TB_WIDTH) - 1;
+
 namespace tb_cfg {
     constexpr double   CLK_PERIOD_NS  = 10.0; // 100MHz Default
-    constexpr uint64_t TIMEOUT_CYCLES = 500;  // Max cycles till timeout
+    constexpr uint64_t TIMEOUT_CYCLES = 1500000;  // Max cycles till timeout
     constexpr const char* TRACE_FILE  = "waveform.fst";
 }   // namespace tb_cfg
 
+
+
+//////////////////////
+// Helper Functions //
+//////////////////////
+
+struct MulResult {
+    uint64_t product;
+    uint64_t latency;
+};
+
+namespace helpfunc{
+
+    // Software bit-serial Multiplier
+    MulResult mult(Testbench<Vbs_mult>& tb, uint32_t a, uint32_t b,
+                       uint64_t max_wait = 100) {
+        tb.dut()->a_i     = a & OPERAND_MASK;
+        tb.dut()->b_i     = b & OPERAND_MASK;
+        tb.dut()->start_i = 1;
+        tb.tick();
+        tb.dut()->start_i = 0;
+        tb.dut()->b_i     = ~b & OPERAND_MASK;
+
+        uint64_t latency = 1;
+        while (!tb.dut()->done_o) {
+            ASSERT_CHECK(latency < max_wait, tb.cycle_count_,
+                        "Timeout: done_o never asserted");
+            tb.tick();
+            ++latency;
+        }
+        return {tb.dut()->product_o, latency};
+    } // MulResult mult
+} // namespace helpfunc
 
 
 ///////////////////////////////
 // Stimulus & Checking Logic //
 ///////////////////////////////
 namespace testcases {
-    void multiply_test(Testbench<Vtop_mac_cvxif>& tb) {
-        std::cout << "[tb] Beginning test 1. 'Multiply_test'" << std::endl
+    void multiply_test(Testbench<Vbs_mult>& tb) {
+        std::cout << "[tb] Beginning test 1. 'Multiply_test'\n";
         tb.reset();
 
-        struct Transaction {
-            uint32_t expected_data;
-            uint64_t injection_cycle;
-        };
+        const uint32_t cases[][2] = {{0xF, 0xA}, {0xD, 0xB}};
+        for (const auto& c : cases) {
+            const MulResult r       = helpfunc::mult(tb, c[0], c[1]);
+            const uint64_t expected = uint64_t(c[0]) * c[1];
 
-        std::queue<Transaction> scoreboard;
-
-        for (uint16_t = 0; i < 10; i++) {
-            do {
-            uint16_t a = 5;
-            uint16_t b = i;
-            uint32_t expected_prod = 5 * i;
-
-            scoreboard.push({expected_prod, tb.cycle_count_})
-
-            tb.dut()->a_i = a;
-            tb.dut()->b_i = b;
-            tb.dut()->start_i = 1;
-            } while (i < 5)
-
-            tb.tick;
-
-            if (tb.dut()->done_o == 1) {
-                Transaction current_tx = scoreboard.front()
-                scoreboard.pop()
-
-                // Calculate latency between data ingestion and output
-                uint64_t latency = tb.cycle_count_ - current_tx.injection_cycle;
-
-                std::cout << "[tb] \tBit-Serial Multiplier Result: " << tb.dut()->result_data_o
-                          << " | Latency: " << latency << " cycles\n";
-
-                ASSERT_CHECK(tb.dut()->product_o == current_tx.expected_data,
-                             tb.cycle_count_,
-                            "MAC computation incorrect");
-            }
+            ASSERT_CHECK(r.product == expected, tb.cycle_count_,
+                        "Multiply produced incorrect product");
+            ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
+                        "Multiplication had the incorrect latency");
         }
+        std::cout << "[PASS] Multiplication test\n";
     }
 }   // namespace testcases
 
@@ -86,7 +99,7 @@ namespace testcases {
 
 int main(int argc, char* argv[]) {
 
-    Testbench<Vtop_mac_cvxif> tb(argc, argv,
+    Testbench<Vbs_mult> tb(argc, argv,
                                 tb_cfg::CLK_PERIOD_NS,
                                 tb_cfg::TIMEOUT_CYCLES,
                                 tb_cfg::TRACE_FILE
@@ -102,9 +115,6 @@ int main(int argc, char* argv[]) {
         // |--------------------|
         // --- Test Scenarios ---
 
-        while (!tb.finished()) {
-            tb.tick();
-        }
     } catch (const std::runtime_error& e) {
         tb.fail_count_++;
         std::cerr << "[tb] Simulation halted due to exception" << std::endl;
