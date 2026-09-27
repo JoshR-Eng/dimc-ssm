@@ -86,7 +86,8 @@ namespace testcases {
             ASSERT_CHECK(r.product == expected, tb.cycle_count_,
                         "Multiply produced incorrect product");
             ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
-                        "Multiplication had the incorrect latency");
+                        "Latency " + std::to_string(r.latency) +
+                        ", expected " + std::to_string(TB_WIDTH + 1));
         }
         std::cout << "[PASS] Multiplication test\n";
     }
@@ -106,6 +107,7 @@ int main(int argc, char* argv[]) {
                                );
 
     std::cout << "[tb] Starting Simulation\n";
+    std::cout << "[tb] TB_WIDTH = " << TB_WIDTH << "\n";
     tb.reset();
 
     try {
