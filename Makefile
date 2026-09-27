@@ -15,8 +15,8 @@ UNIT			?= bs_mult
 WIDTH			?= 16
 TRACE			?= 1
 UNIT_DIR	 	:= obj_dir/$(UNIT)_w$(WIDTH)
-UNIT_LINT_FLAGS := $(LINT_FLAGS) --top-module $(UNIT) -GDATA_WIDTH=$(WIDTH) $(SV_SOURCES)
-UNIT_SIM_FLAGS 	:= -Wall --trace-fst --cc --exe --build -j 0 --top-module $(UNIT) 			\
+UNIT_LINT_FLAGS = $(LINT_FLAGS) --top-module $(UNIT) -GDATA_WIDTH=$(WIDTH) $(SV_SOURCES)
+UNIT_SIM_FLAGS 	= -Wall --trace-fst --cc --exe --build -j 0 --top-module $(UNIT) 			\
 					-GDATA_WIDTH=$(WIDTH) -CFLAGS -DTB_WIDTH=$(WIDTH) --Mdir $(UNIT_DIR) 	\
 					$(SV_SOURCES) $(TB_DIR)/tb_$(UNIT).cpp
 
@@ -30,7 +30,7 @@ REPORT_FILE := reports/mamba_cvxif_area.txt
 
 
 # --- Commands ---
-.PHONY: all lint model sim wave synth clean
+.PHONY: all lint model sim unit sim_unit wave synth clean
 
 all: lint		# Default target
 
