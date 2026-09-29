@@ -4,6 +4,7 @@
 #include <memory>
 #include <queue>
 #include <random>
+#include <iterator>
 
 #include "testbench.hpp"    // Testbench Template
 #include "Vbs_mult.h"  // Top Hardware module
@@ -150,10 +151,10 @@ namespace testcases {
                 ++checks;
             }
         }
-        const uint64_t n = uint64_t(OPERAND_MASK) + 1;
-        ASSERT_CHECK(checks == n*n, tb.cycle_count_,
+        const uint64_t expected_checks = std::size(corners) * std::size(corners);
+        ASSERT_CHECK(checks == expected_checks, tb.cycle_count_,
                     "Ran " + std::to_string(checks) + " checks, expected "
-                    + std::to_string(n*n));
+                    + std::to_string(expected_checks));
         std::cout<< "[PASS] Random Test (" << checks << " products)\n";
     } // random test
 
