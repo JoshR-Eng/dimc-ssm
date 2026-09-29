@@ -2,6 +2,11 @@
 # Date: 17.08.26
 # Description: Makefile for linting and testing SSM Coprocessor
 
+# Hide Verilator Info by default - `make <target> V=1` to see all commands for debugging
+ifndef V
+MAKEFLAGS += --silent
+endif
+
 # --- RTL Sources ---
 # Top Level Test
 TOP_MODULE := top_mac_cvxif
@@ -15,8 +20,8 @@ UNIT			?= bs_mult
 WIDTH			?= 16
 TRACE			?= 1
 UNIT_DIR	 	:= obj_dir/$(UNIT)_w$(WIDTH)
-UNIT_LINT_FLAGS = $(LINT_FLAGS) --top-module $(UNIT) -GDATA_WIDTH=$(WIDTH) $(SV_SOURCES)
-UNIT_SIM_FLAGS 	= -Wall --trace-fst --cc --exe --build -j 0 --top-module $(UNIT) 			\
+UNIT_LINT_FLAGS = $(LINT_FLAGS) --quiet --top-module $(UNIT) -GDATA_WIDTH=$(WIDTH) $(SV_SOURCES)
+UNIT_SIM_FLAGS 	= -Wall --trace-fst --quiet --cc --exe --build -j 0 --top-module $(UNIT) 	\
 					-GDATA_WIDTH=$(WIDTH) -CFLAGS -DTB_WIDTH=$(WIDTH) --Mdir $(UNIT_DIR) 	\
 					$(SV_SOURCES) $(TB_DIR)/tb_$(UNIT).cpp
 
@@ -52,7 +57,7 @@ unit:			# Unit level tests to validate module functions
 	@mkdir -p $(UNIT_DIR)
 	$(VERILATOR) $(UNIT_LINT_FLAGS)
 	$(VERILATOR) $(UNIT_SIM_FLAGS)
-	./$(UNIT_DIR)/V$(UNIT) +trace
+	./$(UNIT_DIR)/V$(UNIT) $(if $(filter 1,$(TRACE)),+trace,)
 sim_unit: 		# Test a number of units across various Datawidth
 	@echo "[INFO] Running Simulation of individual Units..."
 	$(MAKE) unit UNIT=bs_mult WIDTH=4  TRACE=0
