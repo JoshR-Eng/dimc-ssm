@@ -84,13 +84,39 @@ namespace testcases {
             const uint64_t expected = uint64_t(c[0]) * c[1];
 
             ASSERT_CHECK(r.product == expected, tb.cycle_count_,
-                        "Multiply produced incorrect product");
+                        "Multiplication Results: " + std::to_string(r.product) +
+                        ", expected " + std::to_string(expected));
             ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
-                        "Latency " + std::to_string(r.latency) +
+                        "Multplication Latency " + std::to_string(r.latency) +
                         ", expected " + std::to_string(TB_WIDTH + 1));
         }
         std::cout << "[PASS] Multiplication test\n";
     }
+
+    void exhaustive_test(Testbench<Vbs_mult>& tb) {
+        std::cout << "[tb] Beginning test 2. 'Exhaustive'\n";
+        tb.reset();
+
+        uint64_t checks = 0;
+        for (uint32_t a = 0; a <= OPERAND_MASK; ++a) {
+            for (uint32_t b = 0; b <= OPERAND_MASK; b++) {
+                const MulResult r        = helpfunc::mult(tb, a, b);
+                const __int64_t expected = uint64_t(a) * b;
+                ASSERT_CHECK(r.product == expected, tb.cycle_count_,
+                            "a=" + std::to_string(a) + " b=" + std::to_string(b) +
+                            ": Output " + std::to_string(r.product) +
+                            ", expected " + std::to_string(expected));
+                ++checks;
+            }
+        }
+        const uint64_t n = uint64_t(OPERAND_MASK) + 1;
+        ASSERT_CHECK(checks == n*n, tb.cycle_count_,
+                    "Ran " + std::to_string(checks) + " checks, expected "
+                    + std::to_string(n*n));
+        std::cout<< "[PASS] Exhaustive test (" << checks << " products)\n";
+    }
+
+
 }   // namespace testcases
 
 
@@ -114,6 +140,7 @@ int main(int argc, char* argv[]) {
         // --- Test Scenarios ---
         // |--------------------|
         testcases::multiply_test(tb);
+        testcases::exhaustive_test(tb);
         // |--------------------|
         // --- Test Scenarios ---
 
