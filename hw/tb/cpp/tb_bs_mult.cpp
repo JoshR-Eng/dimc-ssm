@@ -91,7 +91,9 @@ namespace testcases {
                         ", expected " + std::to_string(TB_WIDTH + 1));
         }
         std::cout << "[PASS] Multiplication test\n";
-    }
+    }   // multiply test
+
+
 
     void exhaustive_test(Testbench<Vbs_mult>& tb) {
         if (TB_WIDTH > 8) {
@@ -118,7 +120,42 @@ namespace testcases {
                     "Ran " + std::to_string(checks) + " checks, expected "
                     + std::to_string(n*n));
         std::cout<< "[PASS] Exhaustive test (" << checks << " products)\n";
-    }
+    } // exhaustive test
+
+
+
+    void random_test(Testbench<Vbs_mult>& tb) {
+        std::cout << "[tb] Test 3. Random + Corner Cases\n";
+        tb.reset();
+
+        uint64_t checks = 0;
+        const uint32_t corners[] = {
+            0u,                             // Zero
+            1u,                             // One
+            OPERAND_MASK,                   // All ones
+            OPERAND_MASK - 1u,              // All ones except LSB
+            1u << (TB_WIDTH - 1),           // All zeros except MSB
+            0x55555555u & OPERAND_MASK,     // 0101... alternating
+            0xAAAAAAAAu & OPERAND_MASK,     // 1010... alternating
+        };
+
+        for (const uint32_t a : corners) {
+            for (const uint32_t b : corners) {
+                const MulResult r        = helpfunc::mult(tb, a, b);
+                const __int64_t expected = uint64_t(a) * b;
+                ASSERT_CHECK(r.product == expected, tb.cycle_count_,
+                            "a=" + std::to_string(a) + " b=" + std::to_string(b) +
+                            ": Output " + std::to_string(r.product) +
+                            ", expected " + std::to_string(expected));
+                ++checks;
+            }
+        }
+        const uint64_t n = uint64_t(OPERAND_MASK) + 1;
+        ASSERT_CHECK(checks == n*n, tb.cycle_count_,
+                    "Ran " + std::to_string(checks) + " checks, expected "
+                    + std::to_string(n*n));
+        std::cout<< "[PASS] Random Test (" << checks << " products)\n";
+    } // random test
 
 
 }   // namespace testcases
@@ -145,6 +182,7 @@ int main(int argc, char* argv[]) {
         // |--------------------|
         testcases::multiply_test(tb);
         testcases::exhaustive_test(tb);
+        testcases::random_test(tb);
         // |--------------------|
         // --- Test Scenarios ---
 
