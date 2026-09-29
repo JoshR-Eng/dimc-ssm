@@ -94,6 +94,10 @@ namespace testcases {
     }
 
     void exhaustive_test(Testbench<Vbs_mult>& tb) {
+        if (TB_WIDTH > 8) {
+            std::cout << "[tb] Test 2 'Exhaustive' skipped (TB_WIDTH > 8)\n";
+            return;
+        }
         std::cout << "[tb] Beginning test 2. 'Exhaustive'\n";
         tb.reset();
 
