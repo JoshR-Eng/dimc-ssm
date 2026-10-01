@@ -164,7 +164,7 @@ namespace testcases {
         std::cout << "[tb] Random seed = " << SEED << std::endl;
 
         std::mt19937 rng(SEED);
-        std::uniform_real_distribution<uint32_t> dist(0, OPERAND_MASK);
+        std::uniform_int_distribution<uint32_t> dist(0, OPERAND_MASK);
 
         uint64_t random_checks = 0;
         for (uint64_t i = 0; i < NUM_RANDOM; ++i) {
