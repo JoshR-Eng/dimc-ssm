@@ -87,7 +87,7 @@ namespace helpfunc{
                     ", expected " + std::to_string(expected));
         ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
                     ops + ": latency " + std::to_string(r.latency) +
-                    ", expected " + std::to_string(TB_WIDTH));
+                    ", expected " + std::to_string(TB_WIDTH + 1));
     } // Check Result
 
 } // namespace helpfunc
@@ -119,14 +119,22 @@ namespace testcases {
         std::cout << "[tb] Beginning test 2. 'Exhaustive'\n";
         tb.reset();
 
+        uint64_t bad[2][2] = {};
         uint64_t checks = 0;
         for (int32_t a = SMIN; a <= SMAX; ++a) {
-            for (uint32_t b = SMIN; b <= SMAX; b++) {
-                const MulResult r        = helpfunc::mult(tb, a, b);
-                helpfunc::check_result(tb, a, b, r);
+            for (int32_t b = SMIN; b <= SMAX; b++) {
+                const MulResult r = helpfunc::mult(tb, a, b);
+                if (sext(r.product, 2 * TB_WIDTH) != int64_t(a) * b) {
+                    ++bad[a < 0][b < 0];
+                }
                 ++checks;
             }
         }
+        std::cout << "[tb] mismatches  a+b+ " << bad[0][0] << "  a+b- " << bad[0][1]
+                << "  a-b+ " << bad[1][0] << "  a-b- " << bad[1][1] << "\n";
+        ASSERT_CHECK(bad[0][0] + bad[0][1] + bad[1][0] + bad[1][1] == 0, tb.cycle_count_,
+                    "Signed exhaustive test has mismatches (see quadrant table)");
+
         const uint64_t n = uint64_t(OPERAND_MASK) + 1;
         ASSERT_CHECK(checks == n*n, tb.cycle_count_,
                     "Ran " + std::to_string(checks) + " checks, expected "
