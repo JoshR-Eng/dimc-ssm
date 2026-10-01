@@ -29,6 +29,12 @@
 #define TB_WIDTH 16
 #endif
 constexpr uint32_t OPERAND_MASK = (1u << TB_WIDTH) - 1;
+constexpr int32_t SMIN = -(1 << (TB_WIDTH - 1));
+constexpr int32_t SMAX =  (1 << (TB_WIDTH - 1)) - 1;
+
+inline int64_t sext(uint64_t v, unsigned bits) {      // interpret low bits as two's complement
+    return int64_t(v << (64 - bits)) >> (64 - bits);
+}
 
 namespace tb_cfg {
     constexpr double   CLK_PERIOD_NS  = 10.0; // 100MHz Default
@@ -50,14 +56,14 @@ struct MulResult {
 namespace helpfunc{
 
     // Software bit-serial Multiplier
-    MulResult mult(Testbench<Vbs_mult>& tb, uint32_t a, uint32_t b,
+    MulResult mult(Testbench<Vbs_mult>& tb, int32_t a, int32_t b,
                        uint64_t max_wait = 100) {
-        tb.dut()->a_i     = a & OPERAND_MASK;
-        tb.dut()->b_i     = b & OPERAND_MASK;
+        tb.dut()->a_i     = uint32_t(a) & OPERAND_MASK;
+        tb.dut()->b_i     = uint32_t(b) & OPERAND_MASK;
         tb.dut()->start_i = 1;
         tb.tick();
         tb.dut()->start_i = 0;
-        tb.dut()->b_i     = ~b & OPERAND_MASK;
+        tb.dut()->b_i     = ~uint32_t(b) & OPERAND_MASK;
 
         uint64_t latency = 1;
         while (!tb.dut()->done_o) {
