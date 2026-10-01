@@ -151,11 +151,35 @@ namespace testcases {
                 ++checks;
             }
         }
+
         const uint64_t expected_checks = std::size(corners) * std::size(corners);
         ASSERT_CHECK(checks == expected_checks, tb.cycle_count_,
                     "Ran " + std::to_string(checks) + " checks, expected "
                     + std::to_string(expected_checks));
-        std::cout<< "[PASS] Random Test (" << checks << " products)\n";
+
+
+        // Random Checks
+        constexpr uint32_t SEED         = 12345;
+        constexpr uint64_t NUM_RANDOM   = 10000;
+        std::cout << "[tb] Random seed = " << SEED << std::endl;
+
+        std::mt19937 rng(SEED);
+        std::uniform_real_distribution<uint32_t> dist(0, OPERAND_MASK);
+
+        uint64_t random_checks = 0;
+        for (uint64_t i = 0; i < NUM_RANDOM; ++i) {
+            const uint32_t a = dist(rng);
+            const uint32_t b = dist(rng);
+            helpfunc::check_result(tb, a, b, helpfunc::mult(tb, a, b));
+            ++random_checks;
+        }
+        ASSERT_CHECK(random_checks == NUM_RANDOM, tb.cycle_count_,
+                    "Ran " + std::to_string(random_checks) + " random checks, expected"
+                    + std::to_string(NUM_RANDOM));
+
+        // Random & Corner Pass statement
+        std::cout << "[PASS] Test 3. Random Test (" << checks <<  " corner + "
+                  << random_checks << "random products)\n";
     } // random test
 
 
