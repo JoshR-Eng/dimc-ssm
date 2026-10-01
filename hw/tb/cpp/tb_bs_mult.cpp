@@ -179,12 +179,13 @@ namespace testcases {
 
         // Random & Corner Pass statement
         std::cout << "[PASS] Test 3. Random Test (" << checks <<  " corner + "
-                  << random_checks << "random products)\n";
+                  << random_checks << " random products)\n";
     } // random test
 
 
     void start_while_busy_test(Testbench<Vbs_mult>& tb) {
         std::cout << "[tb] Beginning Test 4. 'Start While Busy'\n";
+        tb.reset();
         uint32_t a = 10;
         uint32_t b = 10;
 
@@ -192,17 +193,17 @@ namespace testcases {
         uint64_t max_wait = 500;
         uint64_t expected = a * b;
 
-        tb.dut()->a_i = a & OPERAND_MASK;
-        tb.dut()->b_i = b & OPERAND_MASK;
-        tb.dut()->start_i = 1;
-        tb.tick(); ++latency;
-        tb.dut()->start_i = 0;
-        tb.tick(); ++latency;
-        tb.tick(); ++latency;
-        tb.dut()->b_i = (b+1) & OPERAND_MASK;
-        tb.dut()->start_i = 1;
-        tb.tick(); ++latency;
-        tb.dut()->start_i = 0;
+        tb.dut()->a_i       = a & OPERAND_MASK;
+        tb.dut()->b_i       = b & OPERAND_MASK;
+        tb.dut()->start_i   = 1;
+        tb.tick();          ++latency;
+        tb.dut()->start_i   = 0;
+        tb.tick();          ++latency;
+        tb.tick();          ++latency;
+        tb.dut()->b_i       = (b+1) & OPERAND_MASK;
+        tb.dut()->start_i   = 1;
+        tb.tick();          ++latency;
+        tb.dut()->start_i   = 0;
 
         while (!tb.dut()->done_o) {
             ASSERT_CHECK(latency < max_wait, tb.cycle_count_,
@@ -220,9 +221,14 @@ namespace testcases {
         ASSERT_CHECK(latency == TB_WIDTH+1, tb.cycle_count_,
                     "Latency: " + std::to_string(latency) +
                     " | Expected: " + std::to_string(TB_WIDTH+1));
+        for (int i = 0; i < 2; ++i) {
+            tb.tick();
+            ASSERT_CHECK(!tb.dut()->busy_o, tb.cycle_count_,
+                        "`busy_o` re-asserted after done");
+        }
 
         std::cout << "[PASS] Test 4. Complete\n";
-    }
+    } // start_while_busy_test
 
 }   // namespace testcases
 
