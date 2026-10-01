@@ -68,6 +68,20 @@ namespace helpfunc{
         }
         return {tb.dut()->product_o, latency};
     } // MulResult mult
+
+
+    // Check one multiply against hte reference model
+    void check_result(Testbench<Vbs_mult>& tb, uint32_t a, uint32_t b, const MulResult& r) {
+        const uint64_t expected = uint64_t(a) * b;
+        const std::string ops = "a=" + std::to_string(a) + " b=" + std::to_string(b);
+
+        ASSERT_CHECK(r.product == expected, tb.cycle_count_,
+                    ops + ": product " + std::to_string(r.product) +
+                    ", expected " + std::to_string(expected));
+        ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
+                    ops + ": latency " + std::to_string(r.latency) +
+                    ", expected " + std::to_string(TB_WIDTH));
+    }
 } // namespace helpfunc
 
 
@@ -82,14 +96,7 @@ namespace testcases {
         const uint32_t cases[][2] = {{0xF, 0xA}, {0xD, 0xB}};
         for (const auto& c : cases) {
             const MulResult r       = helpfunc::mult(tb, c[0], c[1]);
-            const uint64_t expected = uint64_t(c[0]) * c[1];
-
-            ASSERT_CHECK(r.product == expected, tb.cycle_count_,
-                        "Multiplication Results: " + std::to_string(r.product) +
-                        ", expected " + std::to_string(expected));
-            ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
-                        "Multplication Latency " + std::to_string(r.latency) +
-                        ", expected " + std::to_string(TB_WIDTH + 1));
+            helpfunc::check_result(tb, c[0], c[1], r);
         }
         std::cout << "[PASS] Multiplication test\n";
     }   // multiply test
@@ -108,11 +115,7 @@ namespace testcases {
         for (uint32_t a = 0; a <= OPERAND_MASK; ++a) {
             for (uint32_t b = 0; b <= OPERAND_MASK; b++) {
                 const MulResult r        = helpfunc::mult(tb, a, b);
-                const __int64_t expected = uint64_t(a) * b;
-                ASSERT_CHECK(r.product == expected, tb.cycle_count_,
-                            "a=" + std::to_string(a) + " b=" + std::to_string(b) +
-                            ": Output " + std::to_string(r.product) +
-                            ", expected " + std::to_string(expected));
+                helpfunc::check_result(tb, a, b, r);
                 ++checks;
             }
         }
@@ -129,6 +132,7 @@ namespace testcases {
         std::cout << "[tb] Beginning Test 3. Random + Corner Cases\n";
         tb.reset();
 
+        // Corner Checks
         uint64_t checks = 0;
         const uint32_t corners[] = {
             0u,                             // Zero
@@ -143,11 +147,7 @@ namespace testcases {
         for (const uint32_t a : corners) {
             for (const uint32_t b : corners) {
                 const MulResult r        = helpfunc::mult(tb, a, b);
-                const __int64_t expected = uint64_t(a) * b;
-                ASSERT_CHECK(r.product == expected, tb.cycle_count_,
-                            "a=" + std::to_string(a) + " b=" + std::to_string(b) +
-                            ": Output " + std::to_string(r.product) +
-                            ", expected " + std::to_string(expected));
+                helpfunc::check_result(tb, a, b, r);
                 ++checks;
             }
         }
