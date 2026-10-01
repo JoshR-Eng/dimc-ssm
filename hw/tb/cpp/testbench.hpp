@@ -85,7 +85,8 @@ class Testbench {
         bool trace_requested_ = false;
 
         void parse_plusargs() {
-            trace_requested_ = context_->commandArgsPlusMatch("trace") != nullptr;
+            const char* t = context_->commandArgsPlusMatch("trace");
+            trace_requested_ = (t && t[0] != '\0');
             const char* max_cycles_arg = context_->commandArgsPlusMatch("max-cycles=");
             if (max_cycles_arg && std::strlen(max_cycles_arg) > 0) {
                 const char* eq = std::strchr(max_cycles_arg, '=');
