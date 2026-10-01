@@ -128,6 +128,10 @@ namespace testcases {
                     ++bad[a < 0][b < 0];
                 }
                 ++checks;
+                const std::string ops = "a=" + std::to_string(a) + " b=" + std::to_string(b);
+                ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
+                    ops + ": latency " + std::to_string(r.latency) +
+                    ", expected " + std::to_string(TB_WIDTH + 1));
             }
         }
         std::cout << "[tb] mismatches  a+b+ " << bad[0][0] << "  a+b- " << bad[0][1]
@@ -185,8 +189,8 @@ namespace testcases {
 
         uint64_t random_checks = 0;
         for (uint64_t i = 0; i < NUM_RANDOM; ++i) {
-            const uint32_t a = dist(rng);
-            const uint32_t b = dist(rng);
+            const int32_t a = dist(rng);
+            const int32_t b = dist(rng);
             helpfunc::check_result(tb, a, b, helpfunc::mult(tb, a, b));
             ++random_checks;
         }
@@ -203,12 +207,12 @@ namespace testcases {
     void start_while_busy_test(Testbench<Vbs_mult>& tb) {
         std::cout << "[tb] Beginning Test 4. 'Start While Busy'\n";
         tb.reset();
-        const uint32_t a = 5;
-        const uint32_t b = -3;
+        const int32_t a = 5;
+        const int32_t b = -3;
 
         uint64_t latency  = 0;
         uint64_t max_wait = 500;
-        int64_t expected = sext((a * b), 2 * TB_WIDTH);
+        int64_t expected = int64_t(a) * b;
 
         tb.dut()->a_i       = a & OPERAND_MASK;
         tb.dut()->b_i       = b & OPERAND_MASK;
@@ -231,7 +235,7 @@ namespace testcases {
 
         uint64_t product = tb.dut()->product_o;
 
-        ASSERT_CHECK(product == expected, tb.cycle_count_,
+        ASSERT_CHECK(sext(product, 2*TB_WIDTH) == expected, tb.cycle_count_,
                     "a=" + std::to_string(a) + " b=" + std::to_string(b) +
                     ": Output " + std::to_string(product) +
                     ", expected " + std::to_string(expected));
