@@ -165,7 +165,7 @@ namespace testcases {
             int32_t(sext(0xAAAAAAAAu & OPERAND_MASK, TB_WIDTH)),
         };
 
-        for (const uint32_t a : corners) {
+        for (const int32_t a : corners) {
             for (const int32_t b : corners) {
                 const MulResult r        = helpfunc::mult(tb, a, b);
                 helpfunc::check_result(tb, a, b, r);
