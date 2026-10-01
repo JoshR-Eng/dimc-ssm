@@ -45,15 +45,18 @@ logic                  done_q, done_d;
 
 
 /// --- 1. Combinational Datapath: one shift-add step
-logic [DATA_WIDTH-1:0] addend;  // multiplicand if multiplier bit is 1, else 0
-logic [DATA_WIDTH:0]   sum;     // bit-serial sum +1 to hold the carry out
-logic [DATA_WIDTH-1:0] step_hi; // upper half of single step shift
-logic [DATA_WIDTH-1:0] step_lo; // lower half of single step shift
+logic [DATA_WIDTH-1:0] addend;    // multiplicand if multiplier bit is 1, else 0
+logic [DATA_WIDTH:0]   addend_x;  // Sign-extedned addend
+logic [DATA_WIDTH:0]   sum;       // bit-serial sum +1 to hold the carry out
+logic [DATA_WIDTH-1:0] step_hi;   // upper half of single step shift
+logic [DATA_WIDTH-1:0] step_lo;   // lower half of single step shift
+logic                  last_step; // Signal that shifter is now on MSB
 
 // Evaluate the inputs and output the sum
 assign addend = prod_lo_q[0] ? a_i : '0;
-assign sum    = {prod_hi_q[DATA_WIDTH-1], prod_hi_q}
-               +{addend[DATA_WIDTH-1]   , addend};
+assign addend_x = {addend[DATA_WIDTH-1], addend} ^ {(DATA_WIDTH+1){last_step}};
+assign sum    = {prod_hi_q[DATA_WIDTH-1], prod_hi_q} + addend_x
+               +{{DATA_WIDTH{1'b0}}, last_step};
 
 // Shift Logic
 assign step_hi = sum[DATA_WIDTH:1];
@@ -69,6 +72,7 @@ always_comb begin : control
   prod_hi_d = prod_hi_q;
   prod_lo_d = prod_lo_q;
   done_d    = 1'b0;
+  last_step = 1'b0;
 
   unique case (state_q)
     IDLE: begin
@@ -85,8 +89,9 @@ always_comb begin : control
       prod_lo_d = step_lo;
       bit_cnt_d = bit_cnt_q + 1'b1;
       if (bit_cnt_q == CNT_WIDTH'(DATA_WIDTH-1)) begin
-        state_d = IDLE;
-        done_d  = 1'b1;
+        last_step = 1'b1;
+        done_d    = 1'b1;
+        state_d   = IDLE;
       end
     end
 
