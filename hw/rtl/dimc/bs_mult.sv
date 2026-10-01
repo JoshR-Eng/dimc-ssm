@@ -52,8 +52,8 @@ logic [DATA_WIDTH-1:0] step_lo; // lower half of single step shift
 
 // Evaluate the inputs and output the sum
 assign addend = prod_lo_q[0] ? a_i : '0;
-assign sum    = $signed({prod_hi_q[DATA_WIDTH-1], prod_hi_q}
-                      + {addend[DATA_WIDTH-1]   , addend}); // widen to protect carry out
+assign sum    = {prod_hi_q[DATA_WIDTH-1], prod_hi_q}
+               +{addend[DATA_WIDTH-1]   , addend};
 
 // Shift Logic
 assign step_hi = sum[DATA_WIDTH:1];
