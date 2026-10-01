@@ -77,17 +77,19 @@ namespace helpfunc{
 
 
     // Check one multiply against hte reference model
-    void check_result(Testbench<Vbs_mult>& tb, uint32_t a, uint32_t b, const MulResult& r) {
-        const uint64_t expected = uint64_t(a) * b;
+    void check_result(Testbench<Vbs_mult>& tb, int32_t a, int32_t b, const MulResult& r) {
+        const int64_t expected = int64_t(a) * int64_t(b);
         const std::string ops = "a=" + std::to_string(a) + " b=" + std::to_string(b);
+        const int64_t actual = sext(r.product, 2*TB_WIDTH);
 
-        ASSERT_CHECK(r.product == expected, tb.cycle_count_,
-                    ops + ": product " + std::to_string(r.product) +
+        ASSERT_CHECK(actual == expected, tb.cycle_count_,
+                    ops + ": product " + std::to_string(actual) +
                     ", expected " + std::to_string(expected));
         ASSERT_CHECK(r.latency == TB_WIDTH + 1, tb.cycle_count_,
                     ops + ": latency " + std::to_string(r.latency) +
                     ", expected " + std::to_string(TB_WIDTH));
-    }
+    } // Check Result
+
 } // namespace helpfunc
 
 
@@ -99,7 +101,7 @@ namespace testcases {
         std::cout << "[tb] Beginning test 1. 'Multiply_test'\n";
         tb.reset();
 
-        const uint32_t cases[][2] = {{0xF, 0xA}, {0xD, 0xB}};
+        const int32_t cases[][2] = {{-3, -5}, {-8, 5}};
         for (const auto& c : cases) {
             const MulResult r       = helpfunc::mult(tb, c[0], c[1]);
             helpfunc::check_result(tb, c[0], c[1], r);
@@ -118,8 +120,8 @@ namespace testcases {
         tb.reset();
 
         uint64_t checks = 0;
-        for (uint32_t a = 0; a <= OPERAND_MASK; ++a) {
-            for (uint32_t b = 0; b <= OPERAND_MASK; b++) {
+        for (int32_t a = SMIN; a <= SMAX; ++a) {
+            for (uint32_t b = SMIN; b <= SMAX; b++) {
                 const MulResult r        = helpfunc::mult(tb, a, b);
                 helpfunc::check_result(tb, a, b, r);
                 ++checks;
@@ -140,18 +142,19 @@ namespace testcases {
 
         // Corner Checks
         uint64_t checks = 0;
-        const uint32_t corners[] = {
-            0u,                             // Zero
-            1u,                             // One
-            OPERAND_MASK,                   // All ones
-            OPERAND_MASK - 1u,              // All ones except LSB
-            1u << (TB_WIDTH - 1),           // All zeros except MSB
-            0x55555555u & OPERAND_MASK,     // 0101... alternating
-            0xAAAAAAAAu & OPERAND_MASK,     // 1010... alternating
+        const int32_t corners[] = {
+            SMIN,
+            SMIN + 1,
+            -1,
+            0,
+            1,
+            SMAX,
+            int32_t(sext(0x55555555u & OPERAND_MASK, TB_WIDTH)),
+            int32_t(sext(0xAAAAAAAAu & OPERAND_MASK, TB_WIDTH)),
         };
 
         for (const uint32_t a : corners) {
-            for (const uint32_t b : corners) {
+            for (const int32_t b : corners) {
                 const MulResult r        = helpfunc::mult(tb, a, b);
                 helpfunc::check_result(tb, a, b, r);
                 ++checks;
@@ -170,7 +173,7 @@ namespace testcases {
         std::cout << "[tb] Random seed = " << SEED << std::endl;
 
         std::mt19937 rng(SEED);
-        std::uniform_int_distribution<uint32_t> dist(0, OPERAND_MASK);
+        std::uniform_int_distribution<int32_t> dist(SMIN, SMAX);
 
         uint64_t random_checks = 0;
         for (uint64_t i = 0; i < NUM_RANDOM; ++i) {
@@ -192,12 +195,12 @@ namespace testcases {
     void start_while_busy_test(Testbench<Vbs_mult>& tb) {
         std::cout << "[tb] Beginning Test 4. 'Start While Busy'\n";
         tb.reset();
-        uint32_t a = 10;
-        uint32_t b = 10;
+        const uint32_t a = 5;
+        const uint32_t b = -3;
 
         uint64_t latency  = 0;
         uint64_t max_wait = 500;
-        uint64_t expected = a * b;
+        int64_t expected = sext((a * b), 2 * TB_WIDTH);
 
         tb.dut()->a_i       = a & OPERAND_MASK;
         tb.dut()->b_i       = b & OPERAND_MASK;
