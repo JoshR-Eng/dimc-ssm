@@ -63,8 +63,10 @@ logic [DATA_WIDTH-1:0] step_lo;   // lower half of single step shift
 logic                  last_step; // Signal that shifter is now on MSB
 
 // Evaluate the inputs and output the sum
+//    Signal for when it's reached `a_i` MSB
 assign last_step = (state_q == SHIFT) && (bit_cnt_q == CNT_WIDTH'(DATA_WIDTH-1));
 assign addend = prod_lo_q[0] ? a_i : '0;
+//    Inverts bit conditionally, if a-i MSB is 1
 assign addend_x = {addend[DATA_WIDTH-1], addend} ^ {(DATA_WIDTH+1){last_step}};
 assign sum    = {prod_hi_q[DATA_WIDTH-1], prod_hi_q} + addend_x
                +{{DATA_WIDTH{1'b0}}, last_step};
