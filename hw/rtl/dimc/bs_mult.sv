@@ -7,9 +7,19 @@
 // Date:            2026-09-25
 // Design Name:     Bit-Serial Multiplier
 // Description:
-//  Bit-serial shift-add multiplier, the compute primitive of one DIMC row
-//  the input operand (b) is multiplies the static coefficient (a) one bit
-//  per cycle against the whole of 'a' in parallel, LSB first
+//    Signed two's-complement bit-serial shift-add multiplier
+//    the compute primitive of one DIMC row. WxW -> 2W bits,
+//    The multiplicand `a_i` (stationary coefficient, e.g. A_bar, B_bar) is
+//    applied in parallel, the multiplier `b_i` (streamed operand e.g. h, x)
+//    is consumed one bit per cycle
+//
+//    Algorithm:
+//      prod_hi <- (prod_hi +/- (b[i] ? a : 0)) >>> 1, LSB shifted into prod_lo
+//      - Both adder operands are sign-extedned to W+1 bits to enable arithmetic
+//        right shift
+//      - b's MSB has weight -2^(W-1), so final step `last_step` subtracts, using
+//        conditional inversion of the addend and last_step carry-in. Hence,one
+//        adder servers both add & subtract (W+1 XORs instead of second carry chain)
 /////////////////////////////////////////////////////////////////////////////////////
 
 module bs_mult #(
