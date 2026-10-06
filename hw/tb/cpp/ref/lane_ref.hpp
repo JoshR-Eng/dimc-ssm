@@ -1,15 +1,18 @@
 # pragma once
 #include <cstdint>
+#include <algorithm>
 
 namespace ref {
     constexpr unsigned FRAC = 13, OUT_BITS = 16;
 
     // mirror _rescale(..., round_mode="round") from golden model
     //      (wide + 2^(shift-1)) >> shift, then clip.
-    int32_t _rnd_sat(int64_t wide, unsigned shift = FRAC, unsigned out_bits = OUT_BITS) {
-        int32_t half = 1 << (shift - 1);
-        int32_t x_shifted = (wide + half) >> shift;
-        return x_shifted;
+    inline int32_t rnd_sat(int64_t wide, unsigned shift = FRAC, unsigned out_bits = OUT_BITS) {
+        const int64_t half    = 1 << (shift - 1);
+        const int64_t q_min   = -(int64_t(1) << (out_bits -1));
+        const int64_t q_max   =  (int64_t(1) << (out_bits -1)) - 1;
+        const int64_t shifted = (wide + half) >> shift;
+        return int32_t(std::clamp(shifted, q_min, q_max));
     }
 
     // One timestep of one channel
@@ -20,21 +23,21 @@ namespace ref {
         int64_t yp;
     };
 
-    LaneOut lane_step(int32_t A, int32_t B, int32_t C, int32_t h_prev, int32_t x) {
+    inline LaneOut lane_step(int32_t A, int32_t B, int32_t C, int32_t h_prev, int32_t x) {
        LaneOut results;
-       results.h  = _rnd_sat(A*h_prev + B*x);
-       results.yp = C*results.h;
+       results.h  = rnd_sat(int64_t(A)*h_prev + B*x);
+       results.yp = int64_t(C)*results.h;
        return results;
     }
 
     // y = rnd_sat( sum(yp[c]) + D*x )
-    int32_t array_y(const int64_t* yp, unsigned n, int32_t D, int32_t x) {
-        int64_t y;
-        int64_t Dx = D*x;
-        for (int i = 0; i < n; i++){
+    inline int32_t array_y(const int64_t* yp, unsigned n, int32_t D, int32_t x) {
+        int64_t y = 0;
+        int64_t Dx = int64_t(D)*x;
+        for (unsigned i = 0; i < n; i++){
             y += yp[i];
         }
         y += Dx;
-        return y;
+        return rnd_sat(y);
     }
 }
