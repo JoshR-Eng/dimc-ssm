@@ -29,6 +29,12 @@ namespace ref {
 
     // y = rnd_sat( sum(yp[c]) + D*x )
     int32_t array_y(const int64_t* yp, unsigned n, int32_t D, int32_t x) {
-
+        int64_t y;
+        int64_t Dx = D*x;
+        for (int i = 0; i < n; i++){
+            y += yp[i];
+        }
+        y += Dx;
+        return y;
     }
 }
