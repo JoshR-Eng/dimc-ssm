@@ -35,7 +35,7 @@ REPORT_FILE := reports/mamba_cvxif_area.txt
 
 
 # --- Commands ---
-.PHONY: all lint model sim unit sim_unit wave synth clean
+.PHONY: all lint model sim unit sim_unit ref_check wave synth clean
 
 all: lint		# Default target
 
@@ -58,8 +58,13 @@ unit:			# Unit level tests to validate module functions
 	$(VERILATOR) $(UNIT_LINT_FLAGS)
 	$(VERILATOR) $(UNIT_SIM_FLAGS)
 	./$(UNIT_DIR)/V$(UNIT) $(if $(filter 1,$(TRACE)),+trace,)
+ref_check:		# Validate the C++ reference model against the Python golden model
+	@makdir -p obj_dir
+	g++ -std=c++20 -O2 -Wall -Wextra -Werror -o obj_dir/ref_check $(TB_DIR)/tb_ref_check.cpp
+	./obj_dir/ref_check
 sim_unit: 		# Test a number of units across various Datawidth
 	@echo "[INFO] Running Simulation of individual Units..."
+	$(MAKE) ref_check
 	$(MAKE) unit UNIT=bs_mult WIDTH=4  TRACE=0
 	$(MAKE) unit UNIT=bs_mult WIDTH=8  TRACE=0
 	$(MAKE) unit UNIT=bs_mult WIDTH=16 TRACE=0
