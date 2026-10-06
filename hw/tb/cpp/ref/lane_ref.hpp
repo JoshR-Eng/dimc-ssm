@@ -4,6 +4,8 @@
 
 namespace ref {
     constexpr unsigned FRAC = 13, OUT_BITS = 16;
+    constexpr int32_t RAIL_MAX =  (1 << (OUT_BITS - 1)) - 1;
+    constexpr int32_t RAIL_MIN = -(1 << (OUT_BITS - 1));
 
     // mirror _rescale(..., round_mode="round") from golden model
     //      (wide + 2^(shift-1)) >> shift, then clip.

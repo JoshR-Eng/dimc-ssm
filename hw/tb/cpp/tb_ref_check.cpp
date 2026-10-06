@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "ref/vectors.hpp"
 #include "ref/lane_ref.hpp"
@@ -60,14 +61,25 @@ int main() {
         // --- H-Check
         for (size_t c = 0; c < cfg::N; ++c) {
             int32_t h = 0;
-            for (size_t k = 0; k < cfg::T, ++k) {
-                //....
+            for (size_t k = 0; k < cfg::T; ++k) {
+                // step the reference for channel c at timestep k
+                const auto [h_new, yp_new] = ref::lane_step(A[c], B[c], C[c], h, x[k]);
+                // check the result is as expected
+                h_chk.expect(h_new, h_trace[(k*cfg::N) + c],
+                             "c=" + std::to_string(c) + " k=" + std::to_string(k));
+                // record yp[k][c], advance h, update max_abs_h[c]
+                yp[k][c] = yp_new;
+                h = h_new;
+                max_abs_h[c] = std::max(max_abs_h[c], std::abs(h_new));
+                // if the new h sits on either rail (-32768 or 32767), ++rail_hits
+                if ((h == ref::RAIL_MAX) || (h == ref::RAIL_MIN)) ++rail_hits;
             }
         }
 
         // --- Y-Check
         for (size_t k = 0; k < cfg::T; ++k) {
-            //...
+            y_chk.expect(ref::array_y(yp[k].data(), cfg::N, D[0], x[k]), y_gold[k],
+                         "k=" + std::to_string(k));
         }
 
         // --- Report
