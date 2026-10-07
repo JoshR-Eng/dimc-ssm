@@ -10,7 +10,7 @@ namespace ref {
     // mirror _rescale(..., round_mode="round") from golden model
     //      (wide + 2^(shift-1)) >> shift, then clip.
     inline int32_t rnd_sat(int64_t wide, unsigned shift = FRAC, unsigned out_bits = OUT_BITS) {
-        const int64_t half    = 1 << (shift - 1);
+        const int64_t half    = int64_t(1) << (shift - 1);
         const int64_t q_min   = -(int64_t(1) << (out_bits -1));
         const int64_t q_max   =  (int64_t(1) << (out_bits -1)) - 1;
         const int64_t shifted = (wide + half) >> shift;
@@ -27,7 +27,7 @@ namespace ref {
 
     inline LaneOut lane_step(int32_t A, int32_t B, int32_t C, int32_t h_prev, int32_t x) {
        LaneOut results;
-       results.h  = rnd_sat(int64_t(A)*h_prev + B*x);
+       results.h  = rnd_sat(int64_t(A)*h_prev + int64_t(B)*x);
        results.yp = int64_t(C)*results.h;
        return results;
     }
