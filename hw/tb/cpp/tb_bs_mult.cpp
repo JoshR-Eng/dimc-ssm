@@ -279,6 +279,25 @@ namespace testcases {
         std::cout << "[PASS] Test 5. Done Pulse\n";
     } // 5. done_pulse_test
 
+
+    // 6. validates `start_i` accepted on the same cycle `done_o` is asserted
+    void back_to_back_test(Testbench<Vbs_mult>& tb) {
+        std::cout << "[tb] Beginning Test 6. 'Back-to-Back Start'\n";
+        tb.reset();
+
+        const int32_t ops[3][2] = {{5, -3}, {-6, -7}, {7, SMIN}};
+
+        for (size_t i = 0; i < std::size(ops); ++i) {
+            if (i > 0) {
+                ASSERT_CHECK(tb.dut()->done_o, tb.cycle_count_,
+                             "Setup failed, not on the done cycle to begin test");
+            }
+            const MulResult r = helpfunc::mult(tb, ops[i][0], ops[i][1]);
+            helpfunc::check_result(tb, ops[i][0], ops[i][1], r);
+        }
+        std::cout << "[PASS] Test 6. Back-to-Back Start\n";
+    } // 6. back_to_back_test
+
 }   // namespace testcases
 
 
@@ -305,6 +324,8 @@ int main(int argc, char* argv[]) {
         testcases::exhaustive_test(tb);
         testcases::random_test(tb);
         testcases::start_while_busy_test(tb);
+        testcases::done_pulse_test(tb);
+        testcases::back_to_back_test(tb);
         // |--------------------|
         // --- Test Scenarios ---
 
