@@ -97,6 +97,7 @@ namespace helpfunc{
 // Stimulus & Checking Logic //
 ///////////////////////////////
 namespace testcases {
+    // 1.
     void multiply_test(Testbench<Vbs_mult>& tb) {
         std::cout << "[tb] Beginning test 1. 'Multiply_test'\n";
         tb.reset();
@@ -107,10 +108,10 @@ namespace testcases {
             helpfunc::check_result(tb, c[0], c[1], r);
         }
         std::cout << "[PASS] Multiplication test\n";
-    }   // multiply test
+    }   // 1. multiply test
 
 
-
+    // 2.
     void exhaustive_test(Testbench<Vbs_mult>& tb) {
         if (TB_WIDTH > 8) {
             std::cout << "[tb] Test 2 'Exhaustive' skipped (TB_WIDTH > 8)\n";
@@ -144,10 +145,10 @@ namespace testcases {
                     "Ran " + std::to_string(checks) + " checks, expected "
                     + std::to_string(n*n));
         std::cout<< "[PASS] Exhaustive test (" << checks << " products)\n";
-    } // exhaustive test
+    } // 2. exhaustive test
 
 
-
+    // 3.
     void random_test(Testbench<Vbs_mult>& tb) {
         std::cout << "[tb] Beginning Test 3. Random + Corner Cases\n";
         tb.reset();
@@ -201,9 +202,10 @@ namespace testcases {
         // Random & Corner Pass statement
         std::cout << "[PASS] Test 3. Random Test (" << checks <<  " corner + "
                   << random_checks << " random products)\n";
-    } // random test
+    } // 3. random test
 
 
+    // 4.
     void start_while_busy_test(Testbench<Vbs_mult>& tb) {
         std::cout << "[tb] Beginning Test 4. 'Start While Busy'\n";
         tb.reset();
@@ -249,7 +251,33 @@ namespace testcases {
         }
 
         std::cout << "[PASS] Test 4. Complete\n";
-    } // start_while_busy_test
+    } // 4. start_while_busy_test
+
+
+    // 5. Validates that done_o is only a single-cycle pulse & product_o held while idle
+    void done_pulse_test(Testbench<Vbs_mult>& tb) {
+        std::cout << "[tb] Beginning Test 5. 'Done Pulse'\n";
+        tb.reset();
+
+        const int32_t a = 5, b = -3;
+        const MulResult r = helpfunc::mult(tb, a, b);
+        helpfunc::check_result(tb, a, b, r);
+
+        ASSERT_CHECK(!tb.dut()->busy_o, tb.cycle_count_,
+                     "busy_o high on the done cycle");
+
+        for (int i = 0; i < TB_WIDTH + 2; ++i) {
+            tb.tick();
+            ASSERT_CHECK(!tb.dut()->done_o, tb.cycle_count_,
+                         i == 0 ? "done_o held for more than one cycle"
+                                : "done_o while idle");
+            ASSERT_CHECK(!tb.dut()->done_o, tb.cycle_count_,
+                        "busy_o asserted while idle with no start");
+            ASSERT_CHECK(tb.dut()->product_o == r.product, tb.cycle_count_,
+                         "product_o not held while idle");
+        }
+        std::cout << "[PASS] Test 5. Done Pulse\n";
+    } // 5. done_pulse_test
 
 }   // namespace testcases
 
