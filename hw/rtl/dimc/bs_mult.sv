@@ -20,6 +20,23 @@
 //      - b's MSB has weight -2^(W-1), so final step `last_step` subtracts, using
 //        conditional inversion of the addend and last_step carry-in. Hence,one
 //        adder servers both add & subtract (W+1 XORs instead of second carry chain)
+//
+//    Interface
+//      - start_i  : accepted only when idle (busy_o == 0) - ignored while busy.
+//      - b_i      : captured on the accepting edge, may change afterwards?).
+//      - a_i      : read on every shift cycle -> MUST be held stable from the
+//                   accepting edge until done_o. May change on the done cycle.
+//      - busy_o   : high from the accepting edge until the final shift. low on
+//                   the done cycle.
+//      - done_o   : single-cycle pulse, W+1 cycles after start_i is asserted
+//                   (counting the accepting edge).
+//      - product_o: valid when done_o is high -> held while idle -> overwritten
+//                   on the accepting edge of the next start.
+//      - Chaining : start_i may be asserted on the done cycle.
+//                   The consumer must take product_o on that same cycle.
+//                   Throughput: one W x W product per W+1 cycles.
+//      - Reset    : rst_ni async active-low -> idle, done_o = 0, product_o = 0.
+//      - Requires DATA_WIDTH >= 2 (bit counter is $clog2(DATA_WIDTH) bits).
 /////////////////////////////////////////////////////////////////////////////////////
 
 module bs_mult #(
