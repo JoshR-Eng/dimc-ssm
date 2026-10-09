@@ -15,11 +15,11 @@
 //
 //    Algorithm:
 //      prod_hi <- (prod_hi +/- (b[i] ? a : 0)) >>> 1, LSB shifted into prod_lo
-//      - Both adder operands are sign-extedned to W+1 bits to enable arithmetic
+//      - Both adder operands are sign-extended to W+1 bits to enable arithmetic
 //        right shift
 //      - b's MSB has weight -2^(W-1), so final step `last_step` subtracts, using
 //        conditional inversion of the addend and last_step carry-in. Hence,one
-//        adder servers both add & subtract (W+1 XORs instead of second carry chain)
+//        adder serves as both add & subtract (W+1 XORs instead of second carry chain)
 //
 //    Interface
 //      - start_i  : accepted only when idle (busy_o == 0) - ignored while busy.

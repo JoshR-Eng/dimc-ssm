@@ -103,8 +103,8 @@ This mutation also reads past the end of `x` at k = 3599 (the same UB note as M4
 | 2. Exhaustive | All signed operand pairs | ✅ 256 | ✅ 65,536 | skipped |
 | 3. Corners + random | 64 corner + 10k random (seed 12345) | ✅ | ✅ | ✅ |
 | 4. Start while busy | `start_i` ignored mid-multiply | ✅ | ✅ | ✅ |
-| 5. Done pulse | `done_o` is one cycle; result held while idle | pending | pending | pending |
-| 6. Back-to-back | Start accepted on the done cycle (zero-bubble chaining) | pending | pending | pending |
+| 5. Done pulse | `done_o` is one cycle; result held while idle | ✅ | ✅ | ✅ |
+| 6. Back-to-back | Start accepted on the done cycle (zero-bubble chaining) | ✅ | ✅ | ✅ |
 
 Latency (W+1) is asserted on every product.
 Every consecutive pair of multiplies in tests 1–3 is already a back-to-back start, because the helper raises `start_i` on the done cycle.
