@@ -13,7 +13,7 @@
 //    a complete State-Space Model Accelerator
 /////////////////////////////////////////////////////////////////////////////////////
 
-package dimc_kpg;
+package dimc_pkg;
   // Arithmetic Contract:
   localparam int unsigned DATA_W  = 16; // Q3.13
   localparam int unsigned FRAC    = 13;

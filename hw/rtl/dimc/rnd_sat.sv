@@ -17,7 +17,7 @@
 module rnd_sat #(
   parameter int unsigned IN_W   = dimc_pkg::LANE_ACC_W,
   parameter int unsigned SHIFT  = dimc_pkg::FRAC,
-  parameter int unsigned OUT_W  = dimc_pkg::DATA_W,
+  parameter int unsigned OUT_W  = dimc_pkg::DATA_W
 ) (
   input  logic [IN_W-1:0]   in_i, // two's complement, wide accumulator
   output logic [OUT_W-1:0]  out_o // round-half-up then saturate
@@ -34,7 +34,8 @@ if (SHIFT < 1) begin : g_bad_shift
   $error("[ERROR: rnd_sat - SHIFT must be >= 1");
 end
 if (OUT_W > IN_W + 1 - SHIFT) begin : g_bad_out_w
-  $error("[ERROR]: rnd_sat - OUT_W too wide for IN_W/SHIFT")
+  $error("[ERROR]: rnd_sat - OUT_W too wide for IN_W/SHIFT");
+end
 
 
 
@@ -51,8 +52,10 @@ assign truncated = {in_i[IN_W-1], in_i[IN_W-1:SHIFT]};
 assign rounded = truncated + RND_W'(in_i[SHIFT-1]);
 
   // 3. Saturation detection
-assign in_range = (&rounded[RND_W-1:OUT_W-1]) | (~|rounded[RND_W-1:OUT-1]);
+assign in_range = (&rounded[RND_W-1:OUT_W-1]) | (~|rounded[RND_W-1:OUT_W-1]);
 
   // 4. Output
 assign out_o = in_range ? rounded[OUT_W-1:0]                                  // fits: low OUT_W bits
-                        : {rounded[RND_w-1], {(OUT_W-1){~rounded[RND_W-1]}}}; // rail from the TRUE MSB
+                        : {rounded[RND_W-1], {(OUT_W-1){~rounded[RND_W-1]}}}; // rail from the TRUE MSB
+
+endmodule
