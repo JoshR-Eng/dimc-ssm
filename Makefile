@@ -8,21 +8,27 @@ MAKEFLAGS += --silent
 endif
 
 # --- RTL Sources ---
+# Input Parameters
+GPARAMS ?= DATA_WIDTH=$(WIDTH)
+G_FLAGS ?= $(addprefix -G,$(GPARAMS)) $(addprefix -CFLAGS -DTB_,$(GPARAMS))
+
 # Top Level Test
-TOP_MODULE := top_mac_cvxif
-RTL_DIR	   := hw/rtl
-TB_DIR     := hw/tb/cpp
-SV_SOURCES := $(shell find $(RTL_DIR) -name '*.sv')
-CPP_TB	   := $(TB_DIR)/tb_mac.cpp
+TOP_MODULE 	:= top_mac_cvxif
+RTL_DIR	   	:= hw/rtl
+TB_DIR     	:= hw/tb/cpp
+PKG_SOURCEs := hw/pkg/dimc_pkg.sv
+SV_SOURCES 	:= $(shell find $(RTL_DIR) -name '*.sv')
+CPP_TB	   	:= $(TB_DIR)/tb_mac.cpp
 
 # Unit Level Test
 UNIT			?= bs_mult
 WIDTH			?= 16
 TRACE			?= 1
 UNIT_DIR	 	:= obj_dir/$(UNIT)_w$(WIDTH)
-UNIT_LINT_FLAGS = $(LINT_FLAGS) --quiet --top-module $(UNIT) -GDATA_WIDTH=$(WIDTH) $(SV_SOURCES)
+UNIT_LINT_FLAGS = $(LINT_FLAGS) --quiet --top-module $(UNIT)	\
+				  $(addprefix -G,$(GPARAMS)) $(SV_SOURCES)
 UNIT_SIM_FLAGS 	= -Wall --trace-fst --quiet --cc --exe --build -j 0 --top-module $(UNIT) 	\
-					-GDATA_WIDTH=$(WIDTH) -CFLAGS -DTB_WIDTH=$(WIDTH) --Mdir $(UNIT_DIR) 	\
+					$(G_FLAGS) -CFLAGS -DTB_WIDTH=$(WIDTH) --Mdir $(UNIT_DIR) 	\
 					$(SV_SOURCES) $(TB_DIR)/tb_$(UNIT).cpp
 
 # --- Toolchain ---
@@ -60,7 +66,7 @@ unit:			# Unit level tests to validate module functions
 	./$(UNIT_DIR)/V$(UNIT) $(if $(filter 1,$(TRACE)),+trace,)
 ref_check:		# Validate the C++ reference model against the Python golden model
 	@mkdir -p obj_dir
-	g++ -std=c++20 -O2 -Wall -Wextra -Werror -o obj_dir/ref_check $(TB_DIR)/tb_ref_check.cpp
+	g++ -O2 -Wall -Wextra -Werror -o obj_dir/ref_check $(TB_DIR)/tb_ref_check.cpp
 	./obj_dir/ref_check
 sim_unit: 		# Test a number of units across various Datawidth
 	@echo "[INFO] Running Simulation of individual Units..."
