@@ -5,7 +5,7 @@
 #include <queue>
 #include <random>
 
-#include "testbench.hpp"    // Testbench Template
+#include "ref/testbench.hpp"    // Testbench Template
 #include "Vtop_mac_cvxif.h"  // Top Hardware module
 
 #define ASSERT_CHECK(condition, cycle, message)                      \
