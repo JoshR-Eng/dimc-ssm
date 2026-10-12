@@ -20,6 +20,6 @@ package dimc_kpg;
   localparam int unsigned N_LANES = 8;
 
   // Accumulator Widths
-  localparam int unsigned LANE_ACC_W  = ;
-  localparam int unsigned ARRAY_ACC_W = ;
+  localparam int unsigned LANE_ACC_W  = 2*DATA_W + 1;
+  localparam int unsigned ARRAY_ACC_W = 2*DATA_W + $clog2(N_LANES + 1);
 endpackage

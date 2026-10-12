@@ -23,6 +23,12 @@ module rnd_sat #(
   output logic [OUT_W-1:0]  out_o // round-half-up then saturate
 );
 
+// --- local Variables
+//    Width of the rounded value: IN_W - SHIFT integer bits, plus 1
+//    so round-up increment cannot overflow
+localparam int unsigned RND_W = IN_W - SHIFT + 1;
+
+
 // --- Error handle potential misconfiguration
 if (SHIFT < 1) begin : g_bad_shift
   $error("[ERROR: rnd_sat - SHIFT must be >= 1");
@@ -30,7 +36,23 @@ end
 if (OUT_W > IN_W + 1 - SHIFT) begin : g_bad_out_w
   $error("[ERROR]: rnd_sat - OUT_W too wide for IN_W/SHIFT")
 
-  // 1. Biased sum: sign-extend the input, add 2^(SHIFT-1).
-  // 2. Rounded value: discard the low SHIFT bits.             Bit-select, or >>> on a SIGNED operand
-  // 3. In range? Which bits must all equal each other?        (Friday's question d)
-  // 4. Output: rounded low OUT_W bits if in range, else the rail chosen by the TRUE MSB
+
+
+// --- Combinational Logic
+
+logic [RND_W-1:0] truncated;
+logic [RND_W-1:0] rounded;
+logic             in_range;
+
+  // 1. Drop the fraction bits
+assign truncated = {in_i[IN_W-1], in_i[IN_W-1:SHIFT]};
+
+  // 2. Round half up
+assign rounded = truncated + RND_W'(in_i[SHIFT-1]);
+
+  // 3. Saturation detection
+assign in_range = (&rounded[RND_W-1:OUT_W-1]) | (~|rounded[RND_W-1:OUT-1]);
+
+  // 4. Output
+assign out_o = in_range ? rounded[OUT_W-1:0]                                  // fits: low OUT_W bits
+                        : {rounded[RND_w-1], {(OUT_W-1){~rounded[RND_W-1]}}}; // rail from the TRUE MSB
