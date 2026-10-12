@@ -5,13 +5,24 @@
 /////////////////////////////////////////////////////////////////////////////////////
 // Engineer:        Josh Rawlinson - joshrawlinson05@outlook.com
 // Date:            2026-09-25
-// Design Name:     Bit-Serial Multiplier
+// Design Name:     Round and Saturate
 // Description:
+//    Requantises a wide two's complement accumulator back to the input format
+//    then saturates to the OUT_W-bit signed range.
 //
 //    Algorithm:
+//      1. Truncate: drop the SHIFT fraction bits, sign-extending by 1 bit
+//                   so that step 2 cannot overflow
+//      2. Round: round-half-up
+//      3. Range: Determines if the wide integer component will fit into the
+//                quantised format
+//      4. Output: outputs the quantised value if in range otherwise the max value
 //
 //    Interface
-//
+//      - Purely combination
+//      - Requires SHIFT >= 1 and OUT_W <= IN_W - SHIFT + 1
+//      - Instances: lane  h_k = rnd_sat(acc)          IN_W = LANE_ACC_W  (33)
+//                   array y_k = rnd_sat(sum yp + Dx)  IN_W = ARRAY_ACC_W (36)
 /////////////////////////////////////////////////////////////////////////////////////
 
 module rnd_sat #(
