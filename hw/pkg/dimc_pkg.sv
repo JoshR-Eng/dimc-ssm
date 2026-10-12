@@ -12,3 +12,14 @@
 //    Current v0.2 Coprocessor is a simple DIMC but will evolve to
 //    a complete State-Space Model Accelerator
 /////////////////////////////////////////////////////////////////////////////////////
+
+package dimc_kpg;
+  // Arithmetic Contract:
+  localparam int unsigned DATA_W  = 16; // Q3.13
+  localparam int unsigned FRAC    = 13;
+  localparam int unsigned N_LANES = 8;
+
+  // Accumulator Widths
+  localparam int unsigned LANE_ACC_W  = ;
+  localparam int unsigned ARRAY_ACC_W = ;
+endpackage
