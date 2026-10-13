@@ -29,7 +29,6 @@ The expected outcome is written down *before* the run, then compared with the ac
 Each mutation corresponds to a bug class that is likely in the `dimc_lane` / `dimc_array` RTL.
 
 **Method.** Each mutation was a single-line edit, applied by hand, run with `make sim_unit`, then reverted with `git restore`.
-Baseline: commit `8628171`.
 
 | # | Mutation | Where | Predicted | h mismatches | y mismatches | First failure | Outcome |
 |---|---|---|---|---|---|---|---|
