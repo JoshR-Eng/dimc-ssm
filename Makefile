@@ -16,7 +16,7 @@ G_FLAGS ?= $(addprefix -G,$(GPARAMS)) $(addprefix -CFLAGS -DTB_,$(GPARAMS))
 TOP_MODULE 	:= top_mac_cvxif
 RTL_DIR	   	:= hw/rtl
 TB_DIR     	:= hw/tb/cpp
-PKG_SOURCES := #hw/pkg/dimc_pkg.sv
+PKG_SOURCES := hw/pkg/dimc_pkg.sv
 SV_SOURCES 	:= $(PKG_SOURCES) $(shell find $(RTL_DIR) -name '*.sv')
 CPP_TB	   	:= $(TB_DIR)/tb_mac.cpp
 
@@ -27,8 +27,8 @@ TRACE			?= 1
 UNIT_DIR	 	:= obj_dir/$(UNIT)_w$(WIDTH)
 UNIT_LINT_FLAGS = $(LINT_FLAGS) --quiet --top-module $(UNIT)	\
 				  $(addprefix -G,$(GPARAMS)) $(SV_SOURCES)
-UNIT_SIM_FLAGS 	= -Wall --trace-fst --quiet --cc --exe --build -j 0 --top-module $(UNIT) 	\
-					$(G_FLAGS) -CFLAGS -std=c++20 -DTB_WIDTH=$(WIDTH) --Mdir $(UNIT_DIR) 	\
+UNIT_SIM_FLAGS 	= -Wall --trace-fst --quiet --cc --exe --build -j 0 --top-module $(UNIT) 		\
+					$(G_FLAGS) -CFLAGS -std=c++20 -CFLAGS -DTB_WIDTH=$(WIDTH) --Mdir $(UNIT_DIR) \
 					$(SV_SOURCES) $(TB_DIR)/tb_$(UNIT).cpp
 
 # --- Toolchain ---

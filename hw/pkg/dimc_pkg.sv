@@ -14,6 +14,7 @@
 /////////////////////////////////////////////////////////////////////////////////////
 
 package dimc_pkg;
+/* verilator lint_off UNUSEDPARAM */  // shared constants: each unit uses a subset by design
   // Arithmetic Contract:
   localparam int unsigned DATA_W  = 16; // Q3.13
   localparam int unsigned FRAC    = 13;
@@ -22,4 +23,5 @@ package dimc_pkg;
   // Accumulator Widths
   localparam int unsigned LANE_ACC_W  = 2*DATA_W + 1;
   localparam int unsigned ARRAY_ACC_W = 2*DATA_W + $clog2(N_LANES + 1);
+  /* verilator lint_on UNUSEDPARAM */
 endpackage
