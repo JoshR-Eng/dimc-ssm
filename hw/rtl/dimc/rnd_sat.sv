@@ -47,8 +47,8 @@ end
 if (OUT_W > IN_W + 1 - SHIFT) begin : g_bad_out_w
   $error("[ERROR]: rnd_sat - OUT_W too wide for IN_W/SHIFT");
 end
-logic unused_fac; // stop verilator calling "Unused Signal" Error
-assign unused_frac = ^in_i[SHIFT-2:0]
+logic unused_frac; // stop verilator calling "Unused Signal" Error
+assign unused_frac = ^in_i[SHIFT-2:0];
 
 
 
