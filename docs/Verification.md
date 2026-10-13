@@ -2,7 +2,7 @@
 
 This document records how each block of the DIMC-SSM accelerator is verified, and the evidence that the checks themselves can fail.
 The arithmetic contract every block is checked against is in the project README.
-(This document is produced by AI, summarising existing notes)
+(This document is produced by AI, but only by summarising my existing verification notes)
 
 ---
 
@@ -110,3 +110,60 @@ Latency (W+1) is asserted on every product.
 Every consecutive pair of multiplies in tests 1–3 is already a back-to-back start, because the helper raises `start_i` on the done cycle.
 Test 6 makes this coverage explicit and guards it.
 The design is `-Wall` lint-clean.
+
+### `rnd_sat` (requantiser: round-half-up, then saturate)
+
+Combinational. `out = clamp(floor(in / 2^SHIFT + 1/2), OUT_MIN, OUT_MAX)`.
+Oracle: `ref::rnd_sat`, itself checked bit-exact against the Python golden model (section 1).
+
+| Config (IN_W / SHIFT / OUT_W) | Purpose | Exhaustive | Directed | Random: in-range / sat+ / sat− | Total checked | Result |
+|---|---|---|---|---|---|---|
+| 12 / 4 / 6 | Algorithm proof (every input) | 4,096 | 91 | 57,557 / 21,303 / 21,140 | 104,187 | ✅ 0 mismatches |
+| 33 / 13 / 16 | Lane instance: h_k = rnd_sat(Ā·h + B̄·x) | — | 98 | 53,123 / 23,348 / 23,529 | 100,098 | ✅ 0 mismatches |
+| 36 / 13 / 16 | Array instance: y_k = rnd_sat(Σ yp + D·x) | — | 98 | 50,389 / 24,698 / 24,913 | 100,098 | ✅ 0 mismatches |
+
+**Directed stages:**
+- ties: exactly ±0.5 LSB for k = −4…4, plus each tie ±1. Covers negative ties (−0.5 → 0, −3.5 → −3).
+- rail boundaries: the input windows that round to OUT_MAX−1, OUT_MAX, OUT_MAX+1, OUT_MIN+1, OUT_MIN and OUT_MIN−1.
+- far out of range: where a missing clamp wraps instead of saturating.
+- input extremes: IN_MIN, IN_MAX, 0, ±1.
+
+**Random stage:** 100k samples (seed 12345). Half are uniform over the full input range; half are in a window across both rails, because uniform sampling alone saturates ~94 % of the time at IN_W = 33. Every class must be hit ≥ 1,000 times, or the run fails.
+
+#### Mutation testing (RTL)
+
+**Method:** one mutation at a time in `rnd_sat.sv`, with temporary `lint_off UNUSEDSIGNAL`/`WIDTH` waivers, run at the lane configuration (33/13/16), then reverted with `git restore`.
+
+| # | Mutation | Predicted first failure | First failure (actual) | Mismatches | Outcome |
+|---|---|---|---|---|---|
+| R1 | No overflow headroom: `RND_W = IN_W − SHIFT` | extreme, IN_MAX | extreme: in = IN_MAX−1 and IN_MAX → −32768 (expected +32767) | **2** / 100,098 | **Caught only by directed extremes** |
+| R2 | Rail chosen from `rounded[OUT_W−1]`, not the true MSB | rail-lo | rail-lo: 32767.5 LSB → −32768 (expected +32767) | 25,057 / 100,098 | Caught |
+| R3 | No rounding carry-in (`rounded = truncated`, i.e. truncation) | tie | tie: −3.5 LSB → −4 (expected −3) | 26,468 / 100,098 | Caught |
+| R4 | No saturation (`out_o = rounded[OUT_W−1:0]`) | rail-hi | rail-lo: 32767.5 LSB → −32768 (wraps) | 46,908 / 100,098 | Caught |
+
+All four were caught, and each first failure was in the stage designed to catch it.
+
+#### Analysis
+
+**R1: overflow at the top of the input range (the key finding).**
+- Without the extra bit, rounding up the largest inputs (truncated value at its maximum, with a carry-in of 1) wraps the sign. The value then saturates to the **wrong rail**.
+- This affects only inputs in [IN_MAX − 2^(SHIFT−1) + 1, IN_MAX], which is the top 2¹² of the 2³³ input values.
+- A uniformly random sample hits that region with p = 2¹² / 2³³ = 2⁻²¹. The 50,000 uniform samples would catch the bug with probability 1 − (1 − 2⁻²¹)^50000 ≈ **2.4 %**. In this run they didn't: both mismatches came from the directed extreme-value test.
+- Conclusion: random testing alone is not enough for arithmetic corner cases. Directed boundary tests are needed alongside it.
+
+**R2: the rail must come from the true sign.**
+- Only *saturating* inputs are affected. In range, the rail logic isn't used.
+- Among saturating inputs, the wrong rail is chosen whenever bit OUT_W−1 differs from the true sign. In the far region that's about half the time: 25,057 ≈ ½ × 46,877 saturating random samples.
+- So in-range tests alone can never detect this bug.
+
+**R3: rounding vs truncation.**
+- Errors appear only for in-range inputs whose discarded fraction is ≥ 0.5 LSB. That's about half the in-range samples: 26,468 ≈ ½ × 53,123.
+- The printed errors are negative ties only because the log stops after 10 errors and the tie loop starts at k = −4. Positive ties fail too (e.g. 2.5 → 2, expected 3).
+- This is the hardware equivalent of reference mutation M1 (section 2). In the lane's recurrence, its −0.5 LSB bias is amplified by 1/(1 − Ā).
+
+**R4: missing saturation wraps around.**
+- **Every** saturating input fails: 46,908 ≈ 46,877 saturating random samples + 31 directed.
+- The far-out-of-range stage shows the wrap explicitly: 32769.5 LSB → −32766, and 65536 LSB → 0.
+- R2 and R4 fail on the same rail-boundary inputs, but the **far-out-of-range stage tells them apart**: R2 always gives a clean (wrong) rail, while R4 gives wrapped values.
+
+**Consequence for the lane:** golden-vector testing (L3) never saturates (section 2, M3). So R2 and R4 would only be caught at lane level by the saturation test **L5**, which is why it's required. This unit test is the first line of defence, and L5 confirms it at lane level.
