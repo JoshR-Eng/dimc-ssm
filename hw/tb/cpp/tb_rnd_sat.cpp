@@ -101,7 +101,20 @@ int main(int argc, char* argv[]) {
         std::cout << "[tb] 1. exhaustive: skipped\n";
     }
 
-    // --- 2. Boundary test
+    // --- 2. Ties (exactly +/- half an output LSB) and their neighbours
+    for (int64_t k = -4; k <= 4; ++k) {
+        int64_t ties[] = {
+            k * cfg::ONE + cfg::HALF,
+            k * cfg::ONE - cfg::HALF
+        };
+        for (int64_t tie : ties ) {
+            check(tie - 1, "tie-1");
+            check(tie,     "tie");      // includes -0.5LSB -> 0 & -1.5LSB -> -1
+            check(tie + 1, "tie+1");
+        }
+    }
+
+    // --- 3. Boundary test
     int64_t boundaries[] = {
         cfg::OUT_MAX - 1,
         cfg::OUT_MAX,
@@ -115,21 +128,21 @@ int main(int argc, char* argv[]) {
         check(r * cfg::ONE + cfg::HALF - 1, "rail-hi");
     }
     // Far out of range a missing clamp wraps here
-    int64_t far_vals[] = {
-        far,
-        far + cfg::ONE * 3 / 2,
-        -far - cfg::ONE * 3 / 2,
-        far * 2 - 1
-    };
     for (int s = 0; s <= 2; ++s) {
         const int64_t far = int64_t(1) << (cfg::OUT_W - 1 + cfg::SHIFT + s);
+        int64_t far_vals[] = {
+            far,
+            far + cfg::ONE * 3 / 2,
+            -far - cfg::ONE * 3 / 2,
+            far * 2 - 1
+        };
         for (int64_t x : far_vals) {
             check(x, "far+");
             check(-x, "far-");
         }
     }
 
-    // --- 3. Extremes of the input range
+    // --- 4. Extremes of the input range
     int64_t in_extreme[] = {
         cfg::IN_MIN,
         cfg::IN_MIN + 1,
@@ -140,9 +153,9 @@ int main(int argc, char* argv[]) {
         cfg::IN_MAX - 1, cfg::IN_MAX
     };
     for (int64_t x : in_extreme) check(x, "extreme");
-    std::cout << "[tb] 2-3. directed: " << st.checked << " checks so far\n";
+    std::cout << "[tb] 2-4. directed: " << st.checked << " checks so far\n";
 
-    // --- 4. Weighted Random: half uniform over full input range
+    // --- 5. Weighted Random: half uniform over full input range
     std::mt19937_64 rng(12345);
     std::uniform_int_distribution<int64_t> full(cfg::IN_MIN, cfg::IN_MAX);
     const int64_t w_lo = std::max(cfg::IN_MIN, (cfg::OUT_MIN - 4) * cfg::ONE);
