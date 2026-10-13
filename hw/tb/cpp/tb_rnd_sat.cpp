@@ -32,7 +32,7 @@ namespace cfg {
     constexpr unsigned IN_W  = TB_IN_W;
     constexpr unsigned SHIFT = TB_SHIFT;
     constexpr unsigned OUT_W = TB_OUT_W;
-    static_assert(IN_W <= 62, "reference uses int64, need headroom for the +half")
+    static_assert(IN_W <= 62, "reference uses int64, need headroom for the +half");
     static_assert(SHIFT >= 1 && OUT_W <= IN_W + 1 - SHIFT, "illegal rnd_sat config");
 
     constexpr int64_t IN_MIN  = -(int64_t(1) << (IN_W - 1));
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
     }
 
     // --- 2. Boundary test
-    int64_t boundaries = {
+    int64_t boundaries[] = {
         cfg::OUT_MAX - 1,
         cfg::OUT_MAX,
         cfg::OUT_MAX + 1,
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
     }
 
     // --- 3. Extremes of the input range
-    int64_t in_extreme = {
+    int64_t in_extreme[] = {
         cfg::IN_MIN,
         cfg::IN_MIN + 1,
         int64_t(-1),
