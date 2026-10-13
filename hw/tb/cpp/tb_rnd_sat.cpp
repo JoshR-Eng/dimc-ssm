@@ -94,8 +94,9 @@ int main(int argc, char* argv[]) {
 
     // --- 1. Exhaustive (small config only)
     if (cfg::IN_W <= 16) {
-        for (int64_t x = cfg::IN_MAX; x <= cfg::IN_MAX; ++x) check(x, "exhaustive");
-        std::cout << "[tb] 1. exhaustive: " << (cfg::IN_MAX - cfg::IN_MIN + 1) << " inputs\n";
+        const uint64_t before = st.checked;
+        for (int64_t x = cfg::IN_MIN; x <= cfg::IN_MAX; ++x) check(x, "exhaustive");
+        std::cout << "[tb] 1. exhaustive: " << (st.checked - before) << " inputs\n";
     } else {
         std::cout << "[tb] 1. exhaustive: skipped\n";
     }
@@ -112,6 +113,20 @@ int main(int argc, char* argv[]) {
     for (int64_t r : boundaries) {
         check(r * cfg::ONE - cfg::HALF,     "rail-lo");
         check(r * cfg::ONE + cfg::HALF - 1, "rail-hi");
+    }
+    // Far out of range a missing clamp wraps here
+    int64_t far_vals[] = {
+        far,
+        far + cfg::ONE * 3 / 2,
+        -far - cfg::ONE * 3 / 2,
+        far * 2 - 1
+    };
+    for (int s = 0; s <= 2; ++s) {
+        const int64_t far = int64_t(1) << (cfg::OUT_W - 1 + cfg::SHIFT + s);
+        for (int64_t x : far_vals) {
+            check(x, "far+");
+            check(-x, "far-");
+        }
     }
 
     // --- 3. Extremes of the input range
