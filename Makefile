@@ -76,7 +76,7 @@ sim_unit: 		# Test a number of units across various Datawidth
 	$(MAKE) unit UNIT=bs_mult WIDTH=16 TRACE=0
 	$(MAKE) unit UNIT=rnd_sat GPARAMS="IN_W=12 SHIFT=4 OUT_W=6" WIDTH=small TRACE=0
 	$(MAKE) unit UNIT=rnd_sat GPARAMS="IN_W=33" WIDTH=lane  TRACE=0
-	$(MAKE) unit UNIT=rnd_sat GPARAMS="IN_W=35" WIDTH=array TRACE=0
+	$(MAKE) unit UNIT=rnd_sat GPARAMS="IN_W=36" WIDTH=array TRACE=0
 	@echo "[INFO] Unit-level Simulation completed."
 wave:			# Open Waveform viewer
 	@echo "[INFO] Opening Fast Signal Trace in Surfer..."
