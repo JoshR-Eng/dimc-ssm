@@ -176,9 +176,27 @@ end
 // --- Sequential Register Updates
 always_ff @(posedge clk_i or negedge rst_ni ) begin
   if (!rst_ni) begin
-    // TODO: Set Default Values
+    state_q     = IDLE;
+    pass_q      = '0;
+    a_bar_q     = '0;
+    b_bar_q     = '0;
+    c_q         = '0;
+    x_q         = '0;
+    h_q         = '0;
+    acc_q       = '0;
+    yp_q        = '0;
+    out_valid_q = 1'b0;
   end else begin
-
+    state_q     = state_d;
+    pass_q      = pass_d;
+    a_bar_q     = a_bar_d;
+    b_bar_q     = b_bar_d;
+    c_q         = c_d;
+    x_q         = x_d;
+    h_q         = h_d;
+    acc_q       = acc_d;
+    yp_q        = yp_d;
+    out_valid_q = out_valid_d;
   end
 end
 
@@ -210,5 +228,9 @@ rnd_sat #(
 
 // --- Output assignment
   // Assign internal variables to the outputs
+assign in_ready_o  = (state_q == IDLE);
+assign out_valid_o = out_valid_q;
+assign h_o         = h_q;
+assign  yp_o        = yp_q;
 
 endmodule
