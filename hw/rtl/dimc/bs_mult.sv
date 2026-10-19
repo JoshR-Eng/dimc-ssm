@@ -40,7 +40,7 @@
 /////////////////////////////////////////////////////////////////////////////////////
 
 module bs_mult #(
-  parameter int unsigned DATA_WIDTH = 16
+  parameter int unsigned DATA_WIDTH = dimc_pkg::DATA_W
 ) (
   input logic clk_i,
   input logic rst_ni,
