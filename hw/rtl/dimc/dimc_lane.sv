@@ -31,24 +31,30 @@ module dimc_lane #(
   input logic [DATA_W-1:0] wr_data_i
 );
 
-typedef enum logic {
+typedef enum logic [1:0] {
   IDLE,
   START,
   WAIT,
   COMMIT
 } state_e;
 
+typedef enum logic [1:0] {
+  Ah,
+  Bx,
+  Ch
+} pass_e;
+
 
 // --- Registers
   // State Control
-logic [1:0] state_q, state_d;         // FSM State Registers
-logic [1:0] coef_sel_q, coef_sel_d;   // Coefficient Selection Registers
+state_e state_q, state_d;         // FSM State Registers
+pass_e  pass_q, pass_d;           // Which multiply is in progress (0=Ah, 1=Bx, 2=Ch)
   // Internal Variables
 logic [DATA_W-1:0] a_bar_q, a_bar_d;  // Coefficient \bar{A}
 logic [DATA_W-1:0] b_bar_q, b_bar_d;  // Coefficient \bar{B}
 logic [DATA_W-1:0] c_q, c_d;          // Coefficient c
-logic [DATA_W-1:0] x_q, x_d;          // Coefficient x
-logic [DATA_W-1:0] h_q, h_d;          // Coefficient h
+logic [DATA_W-1:0] x_q, x_d;          // Input Sample x
+logic [DATA_W-1:0] h_q, h_d;          // State h
   // Output
 logic [LANE_ACC_W-1:0] acc_q, acc_d;
 logic [(DATA_W*2)-1:0] yp_q, yp_d;
@@ -56,12 +62,49 @@ logic                  out_valid_q, out_valid_d;
 
 
 // --- Combinational Datapath
+  // combinational variables
 logic                  mult_start;
 logic [DATA_W-1:0]     mult_a;
-logic [DATA_W-1:0]     mult_a;
+logic [DATA_W-1:0]     mult_b;
 logic [DATA_W-1:0]     h_next;
 logic [LANE_ACC_W-1:0] prod_ext;
 logic [LANE_ACC_W-1:0] acc_sum;
+logic                  mult_done;
+logic                  mult_busy;
+logic [(DATA_W*2)-1:0] mult_product;
+
+  // Flag that asserts when machine is in the START state
+assign mult_start = (state_q == START);
+
+  // Mux that selects which operands to pass into bit-serial multiplier
+always_comb begin : operand_mux
+  unique case (pass_q)
+    Ah: begin
+      mult_a = a_bar_q;
+      mult_b = h_q;
+    end
+
+    Bx: begin
+      mult_a = b_bar_q;
+      mult_b = x_q;
+    end
+
+    Ch: begin
+      mult_a = c_q;
+      mult_b = h_q;
+    end
+
+    default: begin
+      mult_a = '0;
+      mult_b = '0;
+    end
+  endcase
+end // operand_mux
+
+  // Performs signed bit extension
+assign prod_ext = {mult_product[DATA_W-1], mult_product};
+  // Sum the accumulator output and sign-extended product
+assign acc_sum = acc_q + prod_ext;
 
 // --- FSM Logic
   // TODO: Use unique case to define each state
