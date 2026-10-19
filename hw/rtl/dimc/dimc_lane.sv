@@ -7,7 +7,36 @@
 // Date:            2026-10-18
 // Design Name:     Digital In-memory Compute Lane
 // Description:
-//    [[TODO: Complete this description]]
+//    One row of the DIMC array: computes one timestep of one S4D channel by
+//    running a single bit-serial multiplier (bs_mult) three times in sequence.
+//      h_k  = rnd_sat(A_bar*h_{k-1} + B_bar*x_k)   Q3.13, round-half-up, saturate
+//      yp_k = C*h_k                                 Q.26, unrounded (summed in dimc_array)
+//    Weights-stationary: A_bar, B_bar and C are held in the lane and drive a_i;
+//    the streamed operand (h or x) drives b_i.
+//
+//    Schedule (pass_q selects both operands):
+//      pass 0 : acc  = sext(A_bar * h_{k-1})      load
+//      pass 1 : acc += sext(B_bar * x_k)          add
+//      COMMIT : h    = rnd_sat(acc)               h_{k-1} -> h_k
+//      pass 2 : yp   = C * h_k                    uses the NEW h
+//    Each pass is START (1 cycle) + WAIT (W+1 cycles). pass_q changes only on
+//    accept, pass-0 done and COMMIT, so a_i is constant while bs_mult is busy.
+//
+//    Interface
+//      - in_valid_i/in_ready_o : step accepted when both high; ready only in IDLE.
+//                                x_i is sampled on the accepting edge.
+//      - out_valid_o           : single-cycle pulse on cycle 3W+8 (56 at W=16),
+//                                counting the accept cycle as cycle 0.
+//                                h_o/yp_o valid on that cycle; h_o held until the
+//                                next step's COMMIT, yp_o until its pass-2 done.
+//                                No back-pressure: the consumer samples on the pulse.
+//      - wr_en_i/wr_sel_i/wr_data_i : write A_bar (0), B_bar (1), C (2) or h (3).
+//                                Honoured only in IDLE; ignored otherwise. A write
+//                                and an accept in the same cycle are legal and the
+//                                step uses the new value.
+//      - Reset                 : rst_ni async active-low -> IDLE, all registers 0
+//                                (h_{-1} = 0).
+//      - D*x and the cross-channel sum live in dimc_array, not here.
 /////////////////////////////////////////////////////////////////////////////////////
 
 module dimc_lane #(
