@@ -140,7 +140,29 @@ end
 
 
 // --- Module Instantiation
-// TODO: Add `bs_mult.sv` instant...
+  // Bit-serial multiplier: one W x W product per pass (W+1 cycles)
+bs_mult #(
+  .DATA_WIDTH (DATA_W)
+) u_bs_mult (
+  .clk_i      (clk_i),
+  .rst_ni     (rst_ni),
+  .start_i    (mult_start),
+  .busy_o     (mult_busy),
+  .done_o     (mult_done),
+  .a_i        (mult_a),        // stationary coefficient (A_bar, B_bar, C)
+  .b_i        (mult_b),        // streamed operand (h or x), captured on start
+  .product_o  (mult_product)
+);
+
+  // Requantiser: acc_q (Q.26, 33 b) -> h_next (Q3.13, 16 b), round-half-up + saturate
+rnd_sat #(
+  .IN_W   (LANE_ACC_W),
+  .SHIFT  (FRAC),
+  .OUT_W  (DATA_W)
+) u_rnd_sat (
+  .in_i   (acc_q),
+  .out_o  (h_next)
+);
 
 // --- Output assignment
   // Assign internal variables to the outputs
