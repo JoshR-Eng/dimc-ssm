@@ -38,17 +38,11 @@ typedef enum logic [1:0] {
   COMMIT
 } state_e;
 
-typedef enum logic [1:0] {
-  Ah,
-  Bx,
-  Ch
-} pass_e;
-
 
 // --- Registers
   // State Control
 state_e state_q, state_d;         // FSM State Registers
-pass_e  pass_q, pass_d;           // Which multiply is in progress (0=Ah, 1=Bx, 2=Ch)
+logic [1:0] pass_q, pass_d;           // Which multiply is in progress (0=Ah, 1=Bx, 2=Ch)
   // Internal Variables
 logic [DATA_W-1:0] a_bar_q, a_bar_d;  // Coefficient \bar{A}
 logic [DATA_W-1:0] b_bar_q, b_bar_d;  // Coefficient \bar{B}
@@ -79,17 +73,17 @@ assign mult_start = (state_q == START);
   // Mux that selects which operands to pass into bit-serial multiplier
 always_comb begin : operand_mux
   unique case (pass_q)
-    Ah: begin
+    2'd0: begin
       mult_a = a_bar_q;
       mult_b = h_q;
     end
 
-    Bx: begin
+    2'd1: begin
       mult_a = b_bar_q;
       mult_b = x_q;
     end
 
-    Ch: begin
+    2'd2: begin
       mult_a = c_q;
       mult_b = h_q;
     end
@@ -107,25 +101,75 @@ assign prod_ext = {mult_product[DATA_W-1], mult_product};
 assign acc_sum = acc_q + prod_ext;
 
 // --- FSM Logic
-  // TODO: Use unique case to define each state
 always_comb begin : FSM
-  // TODO: Add default - each variable holds it original state
+  // Default - every register holds current state
+  c_d     = c_q;
+  h_d     = h_q;
+  x_d     = x_q;
+  yp_d    = yp_q;
+  acc_d   = acc_q;
+  pass_d  = pass_q;
+  a_bar_d = a_bar_q;
+  b_bar_d = b_bar_q;
+  state_d = state_q;
+  out_valid_d = 1'b0;
+
   unique case (state_q)
       IDLE: begin
-
-      end
+        if (wr_en_i) begin
+          // Load the coeff or state selected
+          // by `wr_sel_i` - only in IDLE
+          // values cna't change when running
+          case (wr_sel_i)
+            2'd0: a_bar_d = wr_data_i;
+            2'd1: b_bar_d = wr_data_i;
+            2'd2: c_d     = wr_data_i;
+            2'd3: h_d     = wr_data_i;
+          endcase
+        end
+        if (in_valid_i) begin
+          x_d     = x_i;
+          pass_d  = '0;
+          state_d = START;
+        end
+      end // IDLE
 
       START: begin
-
-      end
+        // Single Cycle State
+        //  giving each pass its own START
+        //  means operand muxes are already settled
+        state_d = WAIT;
+      end // START
 
       WAIT: begin
-
-      end
+        if (mult_done) begin
+          unique case (pass_q)
+            2'd0: begin
+              acc_d   = prod_ext;
+              pass_d  = 2'd1;
+              state_d = START;
+            end
+            2'd1: begin
+              acc_d   = acc_sum;
+              state_d = COMMIT;
+            end
+            2'd2: begin
+              yp_d = mult_product;
+              out_valid_d = 1'b1;
+              state_d = IDLE;
+            end
+            default: begin
+              state_d = IDLE;
+            end
+          endcase
+        end
+      end // WAIT
 
       COMMIT: begin
-
-      end
+        h_d     = h_next;
+        pass_d  = 2'd2;
+        state_d = START;
+      end // COMMIT
   endcase
 end
 
