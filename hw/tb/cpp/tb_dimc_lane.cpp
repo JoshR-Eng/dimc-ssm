@@ -331,7 +331,7 @@ namespace testcases {
                 const std::string  where = "c=" + std::to_string(c) + " k=" + std::to_string(k);
                 const StepOut      got   = step(tb, g.x.at(k));
                 const ref::LaneOut exp   = ref::lane_step(g.A.at(c), g.B.at(c),
-                                                          g.C.at(c), h_prev, g.x.at(c));
+                                                          g.C.at(c), h_prev, g.x.at(k));
                 h_ref.expect(got.h,   exp.h,                        where);
                 h_gold.expect(got.h,  g.h_trace.at(k * cfg::N + c), where);
                 yp_ref.expect(got.yp, exp.yp,                       where);
