@@ -325,16 +325,17 @@ namespace testcases {
         Check yp_ref{name + " yp vs ref"}, yp_id{name + " yp == C*h"};
 
         for (size_t c = first; c <= last; ++c) {
-            load(tb, g.A[c], g.B[c], g.C[c], 0);
+            load(tb, g.A.at(c), g.B.at(c), g.C.at(c), 0);
             int32_t h_prev = 0;
             for (size_t k = 0; k < cfg::T; ++k) {
                 const std::string  where = "c=" + std::to_string(c) + " k=" + std::to_string(k);
-                const StepOut      got   = step(tb, g.x[k]);
-                const ref::LaneOut exp   = ref::lane_step(g.A[c], g.B[c], g.C[c], h_prev, g.x[k]);
-                h_ref.expect(got.h,   exp.h,                     where);
-                h_gold.expect(got.h,  g.h_trace[k * cfg::N + c], where);
-                yp_ref.expect(got.yp, exp.yp,                    where);
-                yp_id.expect(got.yp,  int64_t(g.C[c]) * got.h,   where);
+                const StepOut      got   = step(tb, g.x.at(k));
+                const ref::LaneOut exp   = ref::lane_step(g.A.at(c), g.B.at(c),
+                                                          g.C.at(c), h_prev, g.x.at(c));
+                h_ref.expect(got.h,   exp.h,                        where);
+                h_gold.expect(got.h,  g.h_trace.at(k * cfg::N + c), where);
+                yp_ref.expect(got.yp, exp.yp,                       where);
+                yp_id.expect(got.yp,  int64_t(g.C.at(c)) * got.h,   where);
                 h_prev = exp.h;
             }
         }
