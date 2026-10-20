@@ -2,14 +2,14 @@
 
 This document records how each block of the DIMC-SSM accelerator is verified, and the evidence that the checks themselves can fail.
 The arithmetic contract every block is checked against is in the project README.
-(This document is produced by AI, but only by summarising my existing verification notes)
+(This document is produced by AI, but only by summarising my existing verification notes and test logs)
 
 ---
 
 ## 1. Reference model vs. golden model (`make ref_check`)
 
-The C++ reference model (`hw/tb/cpp/ref/lane_ref.hpp`) is the oracle for every RTL testbench.
-It is itself checked bit-exact against the Python fixed-point golden model (`model/ssm_model/`) using the exported vectors in `model/vectors/`.
+The C++ reference model (`hw/tb/cpp/ref/lane_ref.hpp`) is the golden model for every RTL testbench.
+It is itself checked bit-exact against the original Python fixed-point golden model (`model/ssm_model/`) using the exported vectors in `model/vectors/`.
 
 | Check | Compared | Mismatches |
 |---|---|---|
@@ -166,3 +166,74 @@ All four were caught, and each first failure was in the stage designed to catch 
 - R2 and R4 fail on the same rail-boundary inputs, but the **far-out-of-range stage tells them apart**: R2 always gives a clean (wrong) rail, while R4 gives wrapped values.
 
 **Consequence for the lane:** golden-vector testing (L3) never saturates (section 2, M3). So R2 and R4 would only be caught at lane level by the saturation test **L5**, which is why it's required. This unit test is the first line of defence, and L5 confirms it at lane level.
+
+## 4. Lane verification: `dimc_lane`
+
+One S4D channel. One bit-serial multiplier (`bs_mult`) runs three passes per timestep:
+
+| Pass | Operation |
+|---|---|
+| 0 | acc = sext(Ā·h_{k−1}) |
+| 1 | acc += sext(B̄·x_k) |
+| COMMIT | h_k = rnd_sat(acc) |
+| 2 | yp_k = C·h_k |
+
+Latency is 3W + 8 = **56 cycles** per timestep at W = 16.
+
+**Oracles.** The testbench drives and observes ports only; it never reads internal signals. Expected values come from four places that do not depend on the RTL:
+1. **Paper:** hand-computed values that are exact in Q3.13 (Test 1). `ref::lane_step` is checked against the same values.
+2. **`ref::lane_step`:** the reference keeps its own h from step to step and is never re-seeded from the DUT.
+3. **Golden trace:** `h_trace_q.txt` from the Python model (Test 3).
+4. **Identity yp = C·h, using the DUT's own h:** this still holds when the h chain has diverged, so it separates h-path bugs from pass-2 bugs.
+**Protocol checks on every step** (inside the `step()` driver, in every test):
+- `in_ready_o` is high before the accept, low while busy, and high again on the result cycle;
+- `out_valid_o` arrives exactly 56 cycles after the accept;
+- a watchdog stops the run if `out_valid_o` never arrives.
+### Results (`make sim_unit`, 20 Oct 2026)
+
+| Test | Coverage | Compared | Mismatches |
+|---|---|---|---|
+| 1. Hand-computed | Two paper cases, both signs of Āh (oracle checked too) | 2 h + 2 yp + 4 oracle | ✅ 0 |
+| 2. Directed | Rounding ties (incl. −0.5 → 0, −1.5 → −1), \|product\| ≥ 2¹⁵, all four sign combinations of (Āh, B̄x), zero and extreme operands, 20-step chain | 36 h + 36 yp | ✅ 0 |
+| 3. Golden, channel 0 | 3600 steps: h vs ref, h vs golden, yp vs ref, yp == C·h | 3,600 × 4 | ✅ 0 |
+| 3. Golden, channels 1–7 | As above | 25,200 × 4 | ✅ 0 |
+| 4. Saturation | Climb to +rail, fall to −rail, recovery; \|acc\| = 2³¹; rail-boundary rounding; overflow sweep | 537 h + 537 yp | ✅ 0 |
+| 5. Random | 10k steps, seed 12345 (half full-range, half in-range biased) | 10,000 h + 10,000 yp | ✅ 0 |
+| 6. Handshake | One-cycle `out_valid_o`, outputs held while idle; random valid/x/writes on every busy cycle ignored; write + accept on the same edge | 53 h + 53 yp | ✅ 0, 0 violations |
+
+**Totals:** 39,428 steps, 2,250,268 cycles. Latency min/max **56/56**, 0 protocol violations. Golden h: **28,800 / 28,800** bit-exact. The design is `-Wall` lint-clean.
+
+**Coverage** (each output class must be hit, or the run fails):
+
+| Test | +rail | −rail | In range | Required |
+|---|---|---|---|---|
+| 4. Saturation | 134 | 134 | 269 | ≥ 50 each |
+| 5. Random | 1,432 | 1,451 | 7,117 | ≥ 500 each |
+
+Test 4 closes the M3 gap: the golden data never reaches a rail, and this test reaches both rails 134 times each.
+
+### Bug caught during bring-up (red → green)
+
+The first version of the lane sign-extended the 32-bit product into the 33-bit accumulator from `mult_product[DATA_W-1]` (bit 15) instead of the product's true sign bit, bit 31.
+The widths still matched (1 + 32 = 33), so lint could not see it.
+The counts were recorded with the first version of the lane testbench. Its tests map one-to-one onto the current Tests 1–6, except that it also had a reset-mid-step check (1 extra step in Test 6).
+
+| Test | Mismatches with the bug | After the fix |
+|---|---|---|
+| 1. Hand-computed h | 2 / 2 | 0 |
+| 2. Directed h | 25 / 36 | 0 |
+| 3. Golden ch 0, h vs golden | 3,600 / 3,600 (first failure k = 0) | 0 |
+| 3. Golden ch 1–7, h vs golden | 25,200 / 25,200 | 0 |
+| 3. yp == C·h (all channels) | **0 / 28,800** | 0 |
+| 4. Saturation h | 276 / 537 | 0 |
+| 5. Random h | 4,960 / 10,000 | 0 |
+| 6. Handshake h | 53 / 54 | 0 |
+| Protocol violations | 0 | 0 |
+
+**Analysis:**
+- **The bug is broader than the classic risk-2 symptom ("wrong only when Āh < 0").** Any product whose bit 15 differs from bit 31 is extended wrongly. Test 1 case a has Āh > 0 and still fails, because B̄x = −2²⁴ = `0xFF00_0000` has bit 15 = 0.
+- **Test 5 fails 4,960 / 10,000 ≈ ½.** For random products, bit 15 matches the sign bit about half the time. The failure rate the arithmetic predicts is the rate measured.
+- **The 11 Test 2 cases that passed have |product| < 2¹⁵**, where bit 15 equals the sign bit and the bug cannot show. The `product +33000` case was built for exactly this bug and caught it.
+- **`yp == C·h` passed 28,800 / 28,800 while every other golden check failed.** That localised the fault to the h path (accumulator or rounding) before any waveform was opened: pass 2 and the output path were correct.
+- **Zero protocol violations and latency 56 throughout:** the bug was datapath-only, and the FSM timing was right on the first attempt.
+
