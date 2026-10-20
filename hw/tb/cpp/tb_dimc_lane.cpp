@@ -38,7 +38,7 @@ namespace cfg {
 }
 
 using TB = Testbench<Vdimc_lane>;
-std::mt19937 rng(cfg::SEED)
+std::mt19937 rng(cfg::SEED);
 
 inline int32_t sext16(uint32_t v) { return int32_t(int16_t(uint16_t(v))); }
 inline int64_t sext32(uint32_t v) { return int64_t(int32_t(v)); }
@@ -222,6 +222,286 @@ struct Golden {
 // Testcases //
 ///////////////
 namespace testcases {
+/* 1. Hand-Computed Steps
+            Stimulus: Values that are exact in Q3.13 (raw = real * 8192), so no rounding
+                      A = 0.75 (6144), B = 0.5 (4096), C = -1.25 (-10240)
+                      a) h0 = +1.0, x = -0.5  ->  h = +0.5 (4096),  yp = -0.625 * 2^26
+                      b) h0 = -1.0, x = +0.5  ->  h = -0.5 (-4096), yp = +0.625 * 2^26
+            Check: DUT matches the paper values, and so does ref::lane_step
+                   Case b has A*h < 0, so the accumulator load must sign-extend */
+    bool hand_computed_test(TB& tb) {
+        std::cout << "[tb] Beginning Test 1. 'Hand-Computed Steps'\n";
+        struct Case { const char* name; int32_t A, B, C, h0, x, h; int64_t yp; };
+        const Case cases[] = {
+            {"a (Ah>0, Bx<0)", 6144, 4096, -10240,  8192, -4096,  4096, -41943040},
+            {"b (Ah<0, Bx>0)", 6144, 4096, -10240, -8192,  4096, -4096,  41943040},
+        };
+
+        Check h_chk{"Test 1 h vs paper"}, yp_chk{"Test 1 yp vs paper"}, ref_chk{"Test 1 ref vs paper"};
+        for (const auto& c : cases) {
+            load(tb, c.A, c.B, c.C, c.h0);
+            const StepOut     got = step(tb, c.x);
+            const ref::LaneOut exp = ref::lane_step(c.A, c.B, c.C, c.h0, c.x);
+            h_chk.expect(got.h,    c.h,  c.name);
+            yp_chk.expect(got.yp,  c.yp, c.name);
+            ref_chk.expect(exp.h,  c.h,  c.name);    // the oracle must agree with the paper too
+            ref_chk.expect(exp.yp, c.yp, c.name);
+        }
+
+        bool ok = h_chk.report(2);
+        ok &= yp_chk.report(2);
+        ok &= ref_chk.report(4);
+        return ok;
+    }
+
+
+/* 2. Directed Steps
+            Stimulus: Single steps aimed at specific arithmetic corners, then a 20-step
+                      chain where the DUT carries h itself
+            Check: h and yp match ref::lane_step on every step */
+    bool directed_test(TB& tb) {
+        std::cout << "[tb] Beginning Test 2. 'Directed Steps'\n";
+        struct Case { const char* name; int32_t A, B, C, h0, x; };
+        const Case cases[] = {
+            // Rounding ties: acc = (2k+1) * 2^12, exactly halfway between two outputs
+            {"tie +0.5 -> +1",           1,     0,   8192,   4096,      0},
+            {"tie -0.5 -> 0",            1,     0,   8192,  -4096,      0},
+            {"tie +1.5 -> +2",           3,     0,   8192,   4096,      0},
+            {"tie -1.5 -> -1",           3,     0,   8192,  -4096,      0},
+            {"just below +0.5 -> 0",     1,     0,   8192,   4095,      0},
+            // |product| >= 2^15: bit 15 is set but is not the sign bit
+            {"product +33000",           3,     0,   8192,  11000,      0},
+            {"product -33000",          -3,     0,   8192,  11000,      0},
+            // All four sign combinations of (A*h, B*x)
+            {"Ah<0 Bx>0",             7000,  3000,  -3000,  -9000,  12000},
+            {"Ah>0 Bx<0",            -7000,  3000,  -3000,  -9000, -12000},
+            {"Ah<0 Bx<0",            -7000, -3000,   5000,   9000,  12000},
+            {"Ah>0 Bx>0",             7000,  3000,   5000,   9000,  12000},
+            // Zero and extreme operands
+            {"all-zero coefficients",    0,     0,      0,   1234,  -1234},
+            {"A = -4.0 (QMIN)",     -32768,     0,   8192,   1000,      0},
+            {"x path only",              0,  8192,   8192,      0, -20000},
+            {"C = QMIN, h = QMAX",    8192,     0, -32768,  32767,      0},
+            {"C = QMAX, h = QMIN",    8192,     0,  32767, -32768,      0},
+        };
+        constexpr size_t N_CASES = sizeof(cases) / sizeof(cases[0]);
+
+        Check h_chk{"Test 2 h"}, yp_chk{"Test 2 yp"};
+        for (const auto& c : cases) {
+            load(tb, c.A, c.B, c.C, c.h0);
+            compare(h_chk, yp_chk, step(tb, c.x), ref::lane_step(c.A, c.B, c.C, c.h0, c.x), c.name);
+        }
+
+        // Chain: the reference carries its own h, never copied from the DUT
+        const int32_t A = 7987, B = 205, C = -3000;     // ~0.975, ~0.025, ~-0.366
+        const int32_t xs[] = {32767, 32767, -32768, 0, 12345, -12345, 1, -1, 30000, -30000,
+                              0, 0, 0, 16384, -16384, 8192, -8192, 100, -100, 0};
+        constexpr size_t N_CHAIN = sizeof(xs) / sizeof(xs[0]);
+
+        load(tb, A, B, C, 0);
+        int32_t h_ref = 0;
+        for (size_t k = 0; k < N_CHAIN; ++k) {
+            const ref::LaneOut exp = ref::lane_step(A, B, C, h_ref, xs[k]);
+            compare(h_chk, yp_chk, step(tb, xs[k]), exp, "chain k=" + std::to_string(k));
+            h_ref = exp.h;
+        }
+
+        bool ok = h_chk.report(N_CASES + N_CHAIN);
+        ok &= yp_chk.report(N_CASES + N_CHAIN);
+        return ok;
+    }
+
+
+/* 3. Golden Channels
+            Stimulus: Each channel's A/B/C from the Python model, h0 = 0, all 3600 x samples
+            Check: per step,
+                     h  vs ref::lane_step and vs the golden h_trace
+                     yp vs ref::lane_step and vs C * (DUT's own h)
+                   The last check localises bugs: if it passes while the rest fail,
+                   the fault is in the h path, not pass 2 */
+    bool golden_test(TB& tb, const Golden& g, size_t first, size_t last, const std::string& name) {
+        std::cout << "[tb] Beginning Test 3. 'Golden " << name << "'\n";
+        Check h_ref{name + " h vs ref"},  h_gold{name + " h vs golden"};
+        Check yp_ref{name + " yp vs ref"}, yp_id{name + " yp == C*h"};
+
+        for (size_t c = first; c <= last; ++c) {
+            load(tb, g.A[c], g.B[c], g.C[c], 0);
+            int32_t h_prev = 0;
+            for (size_t k = 0; k < cfg::T; ++k) {
+                const std::string  where = "c=" + std::to_string(c) + " k=" + std::to_string(k);
+                const StepOut      got   = step(tb, g.x[k]);
+                const ref::LaneOut exp   = ref::lane_step(g.A[c], g.B[c], g.C[c], h_prev, g.x[k]);
+                h_ref.expect(got.h,   exp.h,                     where);
+                h_gold.expect(got.h,  g.h_trace[k * cfg::N + c], where);
+                yp_ref.expect(got.yp, exp.yp,                    where);
+                yp_id.expect(got.yp,  int64_t(g.C[c]) * got.h,   where);
+                h_prev = exp.h;
+            }
+        }
+
+        const uint64_t n = (last - first + 1) * cfg::T;
+        bool ok = h_ref.report(n);
+        ok &= h_gold.report(n);
+        ok &= yp_ref.report(n);
+        ok &= yp_id.report(n);
+        return ok;
+    }
+
+
+/* 4. Saturation
+            The golden data never reaches a rail (ref_check: 0 rail hits), so drive it there
+            Stimulus: a) A = B = 1.0: climb to +rail, fall to -rail, then decay back (A = 0.5)
+                      b) |acc| = 2^31, the largest the 33-bit accumulator ever holds
+                      c) Rounding exactly at the rail boundary (32767.5 and -32768.5 LSB)
+                      d) Overflow sweep: h0 on a rail, x swept across its whole range, so
+                         overflowed sums occur with bit 15 both 0 and 1
+            Check: h and yp match ref::lane_step; both rails hit >= 50 times */
+    bool saturation_test(TB& tb) {
+        std::cout << "[tb] Beginning Test 4. 'Saturation'\n";
+        Check    h_chk{"Test 4 h"}, yp_chk{"Test 4 yp"};
+        Coverage cov;
+
+        // One step, chaining h_ref through the reference
+        auto run = [&](int32_t A, int32_t B, int32_t C, int32_t& h_ref, int32_t x, const std::string& where) {
+            const ref::LaneOut exp = ref::lane_step(A, B, C, h_ref, x);
+            compare(h_chk, yp_chk, step(tb, x), exp, where);
+            cov.add(exp.h);
+            h_ref = exp.h;
+        };
+
+        // a) Climb, fall, recover. h is NOT rewritten before recovery
+        int32_t h = 0;
+        load(tb, 8192, 8192, 8192, 0);
+        for (int i = 0; i < 3; ++i)  run(8192, 8192, 8192, h, cfg::QMAX, "a climb " + std::to_string(i));
+        for (int i = 0; i < 4; ++i)  run(8192, 8192, 8192, h, cfg::QMIN, "a fall "  + std::to_string(i));
+        write(tb, SEL_A, 4096);
+        write(tb, SEL_B, 0);
+        for (int i = 0; i < 12; ++i) run(4096, 0, 8192, h, 0, "a recover " + std::to_string(i));
+
+        // b) Largest accumulator magnitude: (-4)(-4) + (-4)(-4) = +2^31, and the negative side
+        h = cfg::QMIN;
+        load(tb, cfg::QMIN, cfg::QMIN, 8192, h);
+        run(cfg::QMIN, cfg::QMIN, 8192, h, cfg::QMIN, "b acc = +2^31");
+        h = cfg::QMAX;
+        load(tb, cfg::QMIN, cfg::QMIN, 8192, h);
+        run(cfg::QMIN, cfg::QMIN, 8192, h, cfg::QMAX, "b acc ~ -2^31");
+
+        // c) Rail boundary: x = 4096 rounds up past QMAX, x = 4095 just stays in range
+        for (int32_t x : {4096, 4095}) {
+            h = cfg::QMAX;
+            load(tb, 8192, 1, 8192, h);
+            run(8192, 1, 8192, h, x, "c +boundary x=" + std::to_string(x));
+        }
+        for (int32_t x : {-4096, -4097}) {
+            h = cfg::QMIN;
+            load(tb, 8192, 1, 8192, h);
+            run(8192, 1, 8192, h, x, "c -boundary x=" + std::to_string(x));
+        }
+
+        // d) Overflow sweep. A rail chosen from bit 15 instead of the true MSB fails here
+        for (int32_t h0 : {cfg::QMAX, cfg::QMIN}) {
+            for (int32_t x = cfg::QMIN; x <= cfg::QMAX; x += 257) {
+                h = h0;
+                load(tb, 8192, 8192, cfg::QMIN, h);
+                run(8192, 8192, cfg::QMIN, h, x, "d h0=" + std::to_string(h0) + " x=" + std::to_string(x));
+            }
+        }
+
+        // a) 19 + b) 2 + c) 4 + d) 2 x 256 = 537
+        constexpr uint64_t N_STEPS = 19 + 2 + 4 + 2 * 256;
+        bool ok = h_chk.report(N_STEPS);
+        ok &= yp_chk.report(N_STEPS);
+        ok &= cov.report("Test 4", 50);
+        return ok;
+    }
+
+
+/* 5. Random Steps
+            Stimulus: 10k single steps, seed cfg::SEED
+                      odd i:  any 16-bit values (mostly saturates)
+                      even i: |A|,|B| <= 1.0 and |h|,|x| <= 2.0 (mostly in range)
+            Check: h and yp match ref::lane_step; each output class hit >= 500 times */
+    bool random_test(TB& tb) {
+        constexpr int N_STEPS = 10000;
+        std::cout << "[tb] Beginning Test 5. 'Random Steps' (seed " << cfg::SEED << ")\n";
+        std::uniform_int_distribution<int32_t> any(cfg::QMIN, cfg::QMAX);
+        std::uniform_int_distribution<int32_t> coeff(-8192, 8192);
+        std::uniform_int_distribution<int32_t> data(-16384, 16383);
+
+        Check    h_chk{"Test 5 h"}, yp_chk{"Test 5 yp"};
+        Coverage cov;
+        for (int i = 0; i < N_STEPS; ++i) {
+            const bool    wide = (i & 1);
+            const int32_t A  = wide ? any(rng) : coeff(rng);
+            const int32_t B  = wide ? any(rng) : coeff(rng);
+            const int32_t C  = any(rng);
+            const int32_t h0 = wide ? any(rng) : data(rng);
+            const int32_t x  = wide ? any(rng) : data(rng);
+
+            load(tb, A, B, C, h0);
+            const ref::LaneOut exp = ref::lane_step(A, B, C, h0, x);
+            compare(h_chk, yp_chk, step(tb, x), exp, "i=" + std::to_string(i));
+            cov.add(exp.h);
+        }
+
+        bool ok = h_chk.report(N_STEPS);
+        ok &= yp_chk.report(N_STEPS);
+        ok &= cov.report("Test 5", 500);
+        return ok;
+    }
+
+
+/* 6. Handshake
+            Every step() already checks latency and in_ready_o. This test covers the rest:
+            a) out_valid_o is a one-cycle pulse; outputs and in_ready_o hold while idle
+            b) Random valid/x/writes on every busy cycle are ignored (writes only in IDLE)
+            c) A write and an accept on the same edge are legal; the step uses the new value
+            Check: results match ref::lane_step and no protocol violations */
+    bool handshake_test(TB& tb) {
+        std::cout << "[tb] Beginning Test 6. 'Handshake'\n";
+        Check          h_chk{"Test 6 h"}, yp_chk{"Test 6 yp"};
+        const uint64_t errors_before = monitor.errors;
+
+        // a) One step, then 100 idle cycles
+        load(tb, 6144, 4096, -10240, 8192);
+        const StepOut got = step(tb, -4096);
+        compare(h_chk, yp_chk, got, ref::lane_step(6144, 4096, -10240, 8192, -4096), "a");
+        for (int i = 0; i < 100; ++i) {
+            tb.tick();
+            if (tb.dut()->out_valid_o)           monitor.fail(tb, "out_valid_o high while idle");
+            if (!tb.dut()->in_ready_o)           monitor.fail(tb, "in_ready_o low while idle");
+            if (sext16(tb.dut()->h_o)  != got.h)  monitor.fail(tb, "h_o changed while idle");
+            if (sext32(tb.dut()->yp_o) != got.yp) monitor.fail(tb, "yp_o changed while idle");
+        }
+
+        // b) 50 steps with interference, then one clean step to prove the coefficients survived
+        const int32_t A = 7987, B = 205, C = -3000;
+        load(tb, A, B, C, 0);
+        int32_t h_ref = 0;
+        std::uniform_int_distribution<int32_t> any(cfg::QMIN, cfg::QMAX);
+        for (int k = 0; k <= 50; ++k) {
+            const bool         spam = (k < 50);
+            const int32_t      x    = spam ? any(rng) : 1000;
+            const ref::LaneOut exp  = ref::lane_step(A, B, C, h_ref, x);
+            compare(h_chk, yp_chk, step(tb, x, spam), exp, "b k=" + std::to_string(k));
+            h_ref = exp.h;
+        }
+
+        // c) Write A = 0.5 on the same edge as the accept (step() ticks before clearing wr_*)
+        load(tb, 8192, 8192, 8192, 1000);
+        tb.dut()->wr_en_i   = 1;
+        tb.dut()->wr_sel_i  = SEL_A;
+        tb.dut()->wr_data_i = 4096;
+        compare(h_chk, yp_chk, step(tb, 0), ref::lane_step(4096, 8192, 8192, 1000, 0), "c new A used");
+
+        bool ok = h_chk.report(53);
+        ok &= yp_chk.report(53);
+        const uint64_t new_errors = monitor.errors - errors_before;
+        std::cout << (new_errors == 0 ? "[PASS] " : "[FAIL] ") << "Test 6 protocol: "
+                  << new_errors << " violations\n";
+        return ok && (new_errors == 0);
+    }
+
 
 } // testcases
 
@@ -244,11 +524,25 @@ int main(int argc, char* argv[]) {
 
     bool ok = true;
     try {
-        // --- Test Scenarios ---
-        // |--------------------|
+        Golden g;
+        g.x       = vec::load_sized(cfg::DIR + "x_seq_q.txt",   cfg::T);
+        g.h_trace = vec::load_sized(cfg::DIR + "h_trace_q.txt", cfg::T * cfg::N);
+        g.A       = vec::load_sized(cfg::DIR + "A_bar_q.txt",   cfg::N);
+        g.B       = vec::load_sized(cfg::DIR + "B_bar_q.txt",   cfg::N);
+        g.C       = vec::load_sized(cfg::DIR + "C_bar_q.txt",   cfg::N);
 
+        // --- Test Scenarios ---
+        // |--------------------|
+        ok &= testcases::hand_computed_test(tb);
+        ok &= testcases::directed_test(tb);
+        ok &= testcases::golden_test(tb, g, 0, 0,          "channel 0");
+        ok &= testcases::golden_test(tb, g, 1, cfg::N - 1, "channels 1-7");
+        ok &= testcases::saturation_test(tb);
+        ok &= testcases::random_test(tb);
+        ok &= testcases::handshake_test(tb);
         // |--------------------|
         // --- Test Scenarios ---
+
     } catch (const std::exception& e) {
         std::cerr << "[tb] Simulation halted: " << e.what() << "\n";
         ok = false;
@@ -260,6 +554,6 @@ int main(int argc, char* argv[]) {
     ok &= (monitor.errors == 0);
 
     std::cout << "[tb] Simulation Finished after " << tb.cycle_count_ << " cycles\n"
-              << (ok ? "[PASS] All Test Cases Passed!\n" : "[FAIL] See errors above\n");
+              << (ok ? "[PASS] All Test Cases Passed!\n\n" : "[FAIL] See errors above\n\n");
     return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }
