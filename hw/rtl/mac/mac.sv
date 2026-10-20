@@ -10,7 +10,7 @@
 //   Basic Multiple-Accumulate (MAC) module
 //   This is a placeholder for future development
 //   later development will replace this dummy MAC with an
-//   Analog In-Memory Compute crossbar
+//   Digital In-Memory Compute crossbar
 /////////////////////////////////////////////////////////////////////////////////////
 
 module mac #(
