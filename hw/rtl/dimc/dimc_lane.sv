@@ -93,7 +93,9 @@ logic [DATA_W-1:0]     h_next;
 logic [LANE_ACC_W-1:0] prod_ext;
 logic [LANE_ACC_W-1:0] acc_sum;
 logic                  mult_done;
+/* verilator lint_off UNUSEDSIGNAL */
 logic                  mult_busy;
+/* verilator lint_on UNUSEDSIGNAL */
 logic [(DATA_W*2)-1:0] mult_product;
 
   // Flag that asserts when machine is in the START state
