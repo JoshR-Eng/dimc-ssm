@@ -71,6 +71,7 @@ ref_check:		# Validate the C++ reference model against the Python golden model
 sim_unit: 		# Test a number of units across various Datawidth
 	@echo "[INFO] Running Simulation of individual Units..."
 	$(MAKE) ref_check
+	$(MAKE) unit UNIT=dimc_lane GPARAMS="DATA_W=16" WIDTH=lane TRACE=0
 	$(MAKE) unit UNIT=bs_mult WIDTH=4  TRACE=0
 	$(MAKE) unit UNIT=bs_mult WIDTH=8  TRACE=0
 	$(MAKE) unit UNIT=bs_mult WIDTH=16 TRACE=0
