@@ -1,6 +1,6 @@
 # DIMC-SSM: a bit-serial digital compute-in-memory lane for state-space models
 
-A SystemVerilog accelerator core for **S4D state-space models (SSMs)**, aimed at always-on, millitwatt-class edge inference such as hearing aids and wearable sensors. The verified core is one **DIMC lane**: one SSM channel, weights held next to a bit-serial multiplier, computing one timestep in 56 cycles. It is bit-exact against a Python-based fixed-point **golden model** with **mutation testing** to validate the checks can fail.
+A SystemVerilog accelerator core for **S4D state-space models (SSMs)**, aimed at always-on, millitwatt-class edge inference such as hearing aids and wearable sensors. The verified core is one **DIMC lane**: one SSM channel, weights held next to a bit-serial multiplier, computing one timestep in 56 cycles and closing time at 227 MHz on an Artix-7 FPGA with no DSP blocks. It is bit-exact against a Python-based fixed-point **golden model** with **mutation testing** to validate the checks can fail.
 
 | Block | Status |
 |---|---|
@@ -68,7 +68,7 @@ Each pass is one START cycle plus Data Width (W) + 1 multiplier cycles. With an 
 | One step per 10 ms frame (golden-model rate) | 5.6 kHz |
 | One step per sample at 16 kHz audio | 0.9 MHz |
 
-At clock rates this low, leakage would be expected to dominate power instead of switching. This gives significant headroom for increasing the number of channel. The dominance of leakage power is why a small area is favoured over speed.
+At clock rates this low, leakage rather than switching is expected to dominate power, which is why a small area is favoured over speed. The FPGA implementation below runs at 227 MHz. Considering the application of audio processing at 16KHz, this is about 250x faste (see [Implementation Results](#Implementation Results)).
 
 ### Digital Compute-in-Memory
 A lane is on row of a DIMC macro: the wieghts ($\bar A$, $\bar B$, $C$) are stored next to the compute and the streamed operand ($h$ or $x$) arrives one bit per cycle.
@@ -96,6 +96,20 @@ The lane testbench drives and observes ports only:
 | 4 | Saturation: both rails, recovery, overflow sweep. The golden data never saturates. |
 | 5 | 10k random steps |
 | 6 | Handshake: one-cycle `out_valid`, inputs ignored while busy |
+
+## Implementation Results
+A single lane was synthesised, placed and routed out of context - these are the results:
+
+| | |
+| --- | --- |
+| Target | Nexys A7-100T: Xilinx Artix-7 |
+| Tool | Vivado 2024.2 |
+| Logic | 171 LUTs, 20 CARRY4 (0.27\% of the device) |
+| Registers | 190 flip-flops, no latches |
+| DSP / Block RAM | 0 / 0 |
+| Timing | Closes @ 227 MHz (4.4ns period, worst setup slack +0.214 ns) |
+| Time per timestep | 56 cycles = 246 ns |
+| Real-time headroom | $\approx 250 \times$ over one step per sample @ 16kHz |
 
 ## Design Decisions
 
