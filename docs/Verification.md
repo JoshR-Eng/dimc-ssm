@@ -8,8 +8,8 @@ The arithmetic contract every block is checked against is in the project README.
 
 ## 1. Reference model vs. golden model (`make ref_check`)
 
-The C++ reference model (`hw/tb/cpp/ref/lane_ref.hpp`) is the golden model for every RTL testbench.
-It is itself checked bit-exact against the original Python fixed-point golden model (`model/ssm_model/`) using the exported vectors in `model/vectors/`.
+The C++ reference model (`hw/tb/cpp/ref/lane_ref.hpp`) is the oracle for every RTL testbench.
+It is itself checked bit-exact against the Python fixed-point golden model (`model/ssm_model/`) using the exported vectors in `model/vectors/`.
 
 | Check | Compared | Mismatches |
 |---|---|---|
@@ -18,7 +18,6 @@ It is itself checked bit-exact against the original Python fixed-point golden mo
 
 - max\|h\| per channel (LSB): 164, 224, 302, 391, 517, 685, 836, 1061. The rail is ±32767.
 - Steps at a saturation rail: **0**. The golden data does not exercise saturation (see M3).
-
 ---
 
 ## 2. Mutation testing of the reference check
@@ -54,7 +53,6 @@ This is why nearly every step mismatches rather than a scattered few.
 It is also the same mechanism behind the rejection of INT8 (Q2.5):
 - the near-unity poles that give an SSM its long memory are exactly where quantisation error is amplified most;
 - 16-bit Q3.13 was chosen with this in mind.
-
 y fails at k=0, before h has drifted, because the y path has its own rounding stage.
 
 **M2: the h and y checks are independent.**
@@ -66,7 +64,7 @@ This is the RTL bug class "pass 2 reads `h_q` before commit" (lane risk #1).
 **M3: survivor, a known coverage gap.**
 The largest |h| in the golden data is 1061 LSB against a rail of 32767, so the clamp is never active.
 An RTL lane with the saturation logic deleted would pass the golden tests.
-→ **Lane test L5 is required:** Ā = 8192, large ±x, hit both rails and check recovery.
+→ **A lane saturation test is required:** Ā = 8192, large ±x, hit both rails and check recovery. This is lane Test 4 (section 4).
 
 **M4a: indexing convention confirmed.**
 Row k of `h_trace` is h *after* step k.
@@ -79,16 +77,15 @@ The 264 coincidental matches are steps where h_{k+1} = h_k, mostly on the slow c
 So D·x contributes nothing whatever value of x is supplied. As a result:
 - the D·x term in `ref::array_y` has never been checked against Python;
 - the D·x multiply in `dimc_array` cannot be verified by `y_seq_q`. An array with that multiply deleted would pass 3600/3600.
-
 This mutation also reads past the end of `x` at k = 3599 (the same UB note as M4a).
 
 ### Follow-ups arising
 
-| Finding | Action | When |
+| Finding | Action | Status |
 |---|---|---|
-| M3: saturation never exercised | Lane test L5 (both rails + recovery) | Step 3 (lane testbench) |
-| M4b: D = 0 in the golden data | Export a second golden vector set with D ≠ 0; re-run `ref_check`; use it in the array testbench | Step 4 (array) |
-| M4a/M4b: out-of-range reads were silent | Index golden vectors with `.at()` in all testbenches | From the `rnd_sat` testbench onward |
+| M3: saturation never exercised | Lane saturation test (both rails + recovery) | ✅ Done: lane Test 4, 537 steps, 134 at each rail (section 4) |
+| M4b: D = 0 in the golden data | Export a second golden vector set with D ≠ 0; re-run `ref_check`; use it in the array testbench | Open: needed for `dimc_array` (M1b) |
+| M4a/M4b: out-of-range reads were silent | Index golden vectors with `.at()` in all testbenches | `tb_rnd_sat` ✅; `tb_dimc_lane` still uses `[]`, to be switched |
 
 ---
 
@@ -126,7 +123,6 @@ Oracle: `ref::rnd_sat`, itself checked bit-exact against the Python golden model
 - rail boundaries: the input windows that round to OUT_MAX−1, OUT_MAX, OUT_MAX+1, OUT_MIN+1, OUT_MIN and OUT_MIN−1.
 - far out of range: where a missing clamp wraps instead of saturating.
 - input extremes: IN_MIN, IN_MAX, 0, ±1.
-
 **Random stage:** 100k samples (seed 12345). Half are uniform over the full input range; half are in a window across both rails, because uniform sampling alone saturates ~94 % of the time at IN_W = 33. Every class must be hit ≥ 1,000 times, or the run fails.
 
 #### Mutation testing (RTL)
@@ -149,23 +145,21 @@ All four were caught, and each first failure was in the stage designed to catch 
 - This affects only inputs in [IN_MAX − 2^(SHIFT−1) + 1, IN_MAX], which is the top 2¹² of the 2³³ input values.
 - A uniformly random sample hits that region with p = 2¹² / 2³³ = 2⁻²¹. The 50,000 uniform samples would catch the bug with probability 1 − (1 − 2⁻²¹)^50000 ≈ **2.4 %**. In this run they didn't: both mismatches came from the directed extreme-value test.
 - Conclusion: random testing alone is not enough for arithmetic corner cases. Directed boundary tests are needed alongside it.
-
 **R2: the rail must come from the true sign.**
 - Only *saturating* inputs are affected. In range, the rail logic isn't used.
 - Among saturating inputs, the wrong rail is chosen whenever bit OUT_W−1 differs from the true sign. In the far region that's about half the time: 25,057 ≈ ½ × 46,877 saturating random samples.
 - So in-range tests alone can never detect this bug.
-
 **R3: rounding vs truncation.**
 - Errors appear only for in-range inputs whose discarded fraction is ≥ 0.5 LSB. That's about half the in-range samples: 26,468 ≈ ½ × 53,123.
 - The printed errors are negative ties only because the log stops after 10 errors and the tie loop starts at k = −4. Positive ties fail too (e.g. 2.5 → 2, expected 3).
 - This is the hardware equivalent of reference mutation M1 (section 2). In the lane's recurrence, its −0.5 LSB bias is amplified by 1/(1 − Ā).
-
 **R4: missing saturation wraps around.**
 - **Every** saturating input fails: 46,908 ≈ 46,877 saturating random samples + 31 directed.
 - The far-out-of-range stage shows the wrap explicitly: 32769.5 LSB → −32766, and 65536 LSB → 0.
 - R2 and R4 fail on the same rail-boundary inputs, but the **far-out-of-range stage tells them apart**: R2 always gives a clean (wrong) rail, while R4 gives wrapped values.
+**Consequence for the lane:** golden-vector testing never saturates (section 2, M3). So R2 and R4 would only be caught at lane level by the saturation test (lane Test 4), which is why it's required. This unit test is the first line of defence, and Test 4 confirms it at lane level.
 
-**Consequence for the lane:** golden-vector testing (L3) never saturates (section 2, M3). So R2 and R4 would only be caught at lane level by the saturation test **L5**, which is why it's required. This unit test is the first line of defence, and L5 confirms it at lane level.
+---
 
 ## 4. Lane verification: `dimc_lane`
 

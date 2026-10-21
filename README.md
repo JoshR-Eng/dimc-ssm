@@ -22,7 +22,7 @@ An SSM channel is a tiny recurrent filter:
 $$
 \begin{align}
 h_k = \bar{A} \cdot h_{k-1} + \bar{B} \cdot x_k \\
-y_k = \sum_c{C_c \cdot h_k[c] + D \cdot x_k}
+y_k = \sum_c{C_c \cdot h_k[c]} + D \cdot x_k
 \end{align}
 $$
 Unlike a transformer, an SSM needs no growing KV cache. Its memory is a fixed-size state so the cost per sample is constant which is far more suitable for continuous-inference edge devices with a milliwatt budget.
@@ -45,7 +45,7 @@ $$
 \end{align*}
 $$
 
-The array will compute '$y_k = \text{sat16} ( (\sum_c{yp_k[c] + D\cdot x_k + 2^{12}}) >>> 13)$', rounding once after the cross-channel sum.
+The array will compute '$y_k = \text{sat16} ( (\sum_c{yp_k[c]} + D\cdot x_k + 2^{12}) >>> 13)$', rounding once after the cross-channel sum.
 
 ### Datapath
 
@@ -68,10 +68,10 @@ Each pass is one START cycle plus Data Width (W) + 1 multiplier cycles. With an 
 | One step per 10 ms frame (golden-model rate) | 5.6 kHz |
 | One step per sample at 16 kHz audio | 0.9 MHz |
 
-At clock rates this low, leakage would be expected to dominate power instead of switching. This gives significant headroom for increasing the batch size and the number of channel. The dominance of leakage power is why a small area is favoured over speed.
+At clock rates this low, leakage would be expected to dominate power instead of switching. This gives significant headroom for increasing the number of channel. The dominance of leakage power is why a small area is favoured over speed.
 
 ### Digital Compute-in-Memory
-A lane is on row of a DIMC macro: the wieghts ($\bar A, \bar B, C) are stored next to the compute and the streamed operand ($h$ or $x$) arrives one bit per cycle.
+A lane is on row of a DIMC macro: the wieghts ($\bar A$, $\bar B$, $C$) are stored next to the compute and the streamed operand ($h$ or $x$) arrives one bit per cycle.
 
 Hence, this is a *synthesisable DIMC* in the style of compiler-generated macros. Storage is flip-flops beside the logic, not a custom SRAM bitcell array.
 

@@ -3,10 +3,10 @@
 This directory contains the *floating-point* and *fixed-point* golden model for core computation of an S4D architecture. This generates the bit-exact test vectors the RTL testbench verifies against. This README records the design decisions made during that phase and why.
 
 ## Architecture Choice
-### SD4 (diagonal, static/LTI), no Mamba selective scan
+### S4D (diagonal, static/LTI), no Mamba selective scan
 The recurrent core uses a per-channel diagonal `A` and which `A`, `B`, `C`, `D` are precomputed on the host and held fixed at runtime. This is different to the input-dependent selective mechanism seen in the more advanced Mamba. This was a deliberate scope decision, not a simplifcation by default:
-- A digaonal, LTI `A` makes exact ZOH discretization affordable ($\bar{A} = \exp(A\Delta)$).
-- Target application is edge sensor/audio processing. Mamaba selectivity is computationally expensive and power hungry and so it's not necessary
+- A diagonal, LTI `A` makes exact ZOH discretization affordable ($\bar{A} = \exp(A\Delta)$).
+- Target application is edge sensor/audio processing. Mamba selectivity is computationally expensive and power hungry and so it's not necessary
 - Future Proofing, with rapid development in SSM architectures targetting exact architecures would soon become antiquated. Hence, the focus is on the recurrent core that is foundational to all SSM computation.
 
 ## Numerics
